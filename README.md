@@ -93,6 +93,26 @@ https://docs.openclaw.ai/
 2. Compile: `bun run compile`
 3. Press F5 to launch the Extension Development Host
 
+## Publishing
+
+1. Create or verify your Marketplace publisher matches `package.json` (`openknot`):
+   https://marketplace.visualstudio.com/
+2. Create a Personal Access Token (Azure DevOps) with Marketplace scopes:
+   https://dev.azure.com/
+   - Scopes: Marketplace → Acquire, Publish
+3. Install vsce:
+   ```
+   npm install -g @vscode/vsce
+   ```
+4. Sign in:
+   ```
+   vsce login openknot
+   ```
+5. Publish:
+   ```
+   vsce publish
+   ```
+
 ## License
 
 [MIT](./LICENSE)

@@ -1,6 +1,6 @@
 {
-  "name": "openclaw",
-  "displayName": "OpenClaw",
+  "name": "openclaw-extension",
+  "displayName": "OpenClaw Extension",
   "description": "Status bar connector for the OpenClaw CLI",
   "version": "0.0.1",
   "publisher": "openknot",
@@ -67,7 +67,7 @@
   },
   "devDependencies": {
     "@types/vscode": "^1.108.1",
-    "@types/node": "22.x",
+    "@types/node": "^22.19.7",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "eslint": "^9.39.2",

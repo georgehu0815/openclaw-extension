@@ -5,7 +5,7 @@
     "": {
       "name": "openclaw",
       "devDependencies": {
-        "@types/node": "22.x",
+        "@types/node": "^22.19.7",
         "@types/vscode": "^1.108.1",
         "@typescript-eslint/eslint-plugin": "^8.54.0",
         "@typescript-eslint/parser": "^8.54.0",
