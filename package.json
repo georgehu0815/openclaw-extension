@@ -1,0 +1,76 @@
+{
+  "name": "openclaw",
+  "displayName": "OpenClaw",
+  "description": "Status bar connector for the OpenClaw CLI",
+  "version": "0.0.1",
+  "publisher": "openknot",
+  "author": {
+    "name": "Val Alexander",
+    "email": "val@openknot.ai"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/openknots/openclaw-extension",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openknots/openclaw-extension.git"
+  },
+  "icon": "assets/images/icon.png",
+  "engines": {
+    "vscode": "^1.108.2"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "cli",
+    "openclaw",
+    "openknot",
+    "clawdbot",
+    "moltbot",
+    "vscode"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "openclaw.connect",
+        "title": "OpenClaw: Connect"
+      }
+    ],
+    "configuration": {
+      "title": "OpenClaw",
+      "properties": {
+        "openclaw.autoConnect": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically connect to OpenClaw on startup"
+        },
+        "openclaw.command": {
+          "type": "string",
+          "default": "openclaw status",
+          "description": "Command to run when connecting (e.g. 'openclaw status' or 'wsl openclaw status')"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.108.1",
+    "@types/node": "22.x",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3"
+  }
+}
