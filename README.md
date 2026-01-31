@@ -1,3 +1,5 @@
+![OpenClaw hero](assets/images/readme-hero.png)
+
 # OpenClaw VS Code Extension
 
 VS Code status bar shortcut for connecting to OpenClaw. It shows connection state and runs your configured OpenClaw CLI command in a terminal.
@@ -6,22 +8,22 @@ Quick, super-simple overview: see `SUMMARY.md`.
 
 ## Features
 
-- Status bar indicator with idle, connecting, connected, and error states
-- One-click connection command in a dedicated terminal
-- Reuses the same terminal session for repeat connects
-- Auto-connect on startup (optional)
-- Configurable command per user environment
-- Guided setup command for installing Node.js and OpenClaw
-- One-click install actions when the CLI is missing
-- Legacy CLI name migration prompts (molt/clawdbot → openclaw)
-- Node.js presence check with install helpers
+- **`Status Bar Indicator`:** Shows idle, connecting, connected, and error states at a glance.
+- **`One-Click Connect`:** Runs your OpenClaw command in a dedicated terminal.
+- **`Terminal Reuse`:** Keeps a single terminal session for quick reconnects.
+- **`Auto-Connect`:** Optionally connect on startup.
+- **`Custom Command`:** Configure the exact command for your environment.
+- **`Guided Setup`:** Install Node.js and OpenClaw with prompts.
+- **`Install Shortcuts`:** One-click install or copy commands when the CLI is missing.
+- **`Legacy Migration`:** Prompts to upgrade from `molt`/`clawdbot` to `openclaw`.
+- **`Node Check`:** Detects missing Node.js and offers installers.
 
 ## Quick Start (macOS + Windows)
 
-### 1. Install Node.js (required)
+### 1. Install Node.js (*required*)
 
-- Download the latest LTS from https://nodejs.org/
-- Verify: `node -v` shows `v22.x` or newer
+- Download the latest LTS from https://nodejs.org
+- **Verify**: `node -v` shows `v22.x` or newer
 
 ### 2. Install OpenClaw
 
@@ -29,7 +31,7 @@ Quick, super-simple overview: see `SUMMARY.md`.
 npm install -g openclaw@latest
 ```
 
-Verify: `openclaw --help`
+> **Verify**: `openclaw --help`
 
 ### 3. Onboard and start the Gateway
 
@@ -38,9 +40,9 @@ openclaw onboard --install-daemon
 openclaw gateway --port 18789
 ```
 
-Open the dashboard: `http://127.0.0.1:18789/`
+**Open Dashboard**: `http://127.0.0.1:18789/`
 
-### 4. Log in to a channel (optional)
+### 4. Log in to a channel (*optional*)
 
 ```
 openclaw channels login
@@ -56,10 +58,10 @@ Click the `OpenClaw` status bar item. The extension sends your configured comman
 
 If you see a "command not found: openclaw" error in VS Code, use the built-in helpers:
 
-- Run `OpenClaw: Setup` from the Command Palette
-- Or click the action buttons in the error message to install or copy the command
+- Run `OpenClaw: Setup` from the Command Palette; OR
+- Click the action buttons in the error message to install or copy the command
 
-The setup flow can copy the install command, open docs, or run the command in a terminal after you confirm.
+The setup flow can also detect missing Node.js, guide you to install the latest LTS, and then install OpenClaw.
 
 ## Configuration
 
@@ -74,8 +76,7 @@ By default, OpenClaw uses its bundled Pi binary in RPC mode. If you want a diffe
 
 `~/.openclaw/openclaw.json`
 
-See the OpenClaw docs for configuration examples and provider setup:
-https://docs.openclaw.ai/
+> See the OpenClaw docs for configuration examples and provider setup: https://docs.openclaw.ai
 
 ## Troubleshooting
 
@@ -92,7 +93,7 @@ If you previously installed the legacy CLI, update to the new `openclaw` name us
 - Recommended (macOS/Linux): `curl -fsSL https://openclaw.bot/install.sh | bash`
 - Global npm: `npm install -g openclaw@latest`
 
-See https://docs.openclaw.ai/install/updating for full update guidance.
+> *See https://docs.openclaw.ai/install/updating for full update guidance.*
 
 ### "node: command not found" or Node too old
 
@@ -101,8 +102,8 @@ See https://docs.openclaw.ai/install/updating for full update guidance.
 
 ### Gateway not running
 
-- Run: `openclaw gateway --port 18789`
-- Open: `http://127.0.0.1:18789/`
+- **Run**: `openclaw gateway --port 18789`
+- **Open**: `http://127.0.0.1:18789/`
 
 ### No status bar item
 

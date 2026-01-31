@@ -6,6 +6,11 @@ Semantic Versioning.
 
 ## Unreleased
 
+## 0.0.5
+
+- Add status bar accessibility metadata and reuse shared label formatting.
+- Consolidate install/migration prompts into "More options" quick picks.
+
 ## 0.0.4
 
 - Add beginner-friendly setup command and guided install actions.
