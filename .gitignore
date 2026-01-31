@@ -44,3 +44,5 @@ webview-ui/dist/
 
 # Misc
 .idea/
+
+.venv
