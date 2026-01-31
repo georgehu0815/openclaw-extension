@@ -37,10 +37,10 @@
   <image href="image.png" x="210" y="110" width="660" height="660" preserveAspectRatio="xMidYMid meet" filter="url(#logoShadow)"/>
   <image href="image.png" x="1560" y="190" width="760" height="760" preserveAspectRatio="xMidYMid meet" opacity="0.08"/>
 
-  <text x="1050" y="385" fill="#F6F3FF" font-size="128" font-weight="700" font-family="Inter, Segoe UI, Arial, sans-serif" letter-spacing="2">
+  <text x="1350" y="385" fill="#F6F3FF" font-size="128" font-weight="700" font-family="Inter, Segoe UI, Arial, sans-serif" letter-spacing="2">
     OpenClaw Extension
   </text>
-  <text x="1050" y="455" fill="#CFC6F2" font-size="36" font-weight="500" font-family="Inter, Segoe UI, Arial, sans-serif" letter-spacing="4">
+  <text x="1350" y="455" fill="#CFC6F2" font-size="36" font-weight="500" font-family="Inter, Segoe UI, Arial, sans-serif" letter-spacing="4">
     Threaded by OpenKnot
   </text>
 

@@ -1,4 +1,4 @@
-![OpenClaw hero](assets/images/readme-hero.png)
+![OpenClaw hero](assets/images/readme.png)
 
 # OpenClaw VS Code Extension
 
