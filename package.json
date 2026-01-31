@@ -2,7 +2,7 @@
   "name": "openclaw-extension",
   "displayName": "OpenClaw Extension",
   "description": "Status bar connector for the OpenClaw CLI",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "publisher": "openknot",
   "author": {
     "name": "Val Alexander",
@@ -14,7 +14,7 @@
     "type": "git",
     "url": "https://github.com/openknots/openclaw-extension.git"
   },
-  "icon": "assets/images/icon.png",
+  "icon": "assets/images/image.png",
   "engines": {
     "vscode": "^1.105.0"
   },
@@ -40,6 +40,10 @@
       {
         "command": "openclaw.connect",
         "title": "OpenClaw: Connect"
+      },
+      {
+        "command": "openclaw.setup",
+        "title": "OpenClaw: Setup"
       }
     ],
     "configuration": {
@@ -69,7 +73,7 @@
     "publish:all": "npm run publish:vsce && npm run publish:ovsx"
   },
   "devDependencies": {
-    "@types/vscode": "^1.105.1",
+    "@types/vscode": "~1.105.0",
     "@types/node": "^22.19.7",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",

@@ -6,10 +6,17 @@ Semantic Versioning.
 
 ## Unreleased
 
-- Improve connection flow, status states, and error handling.
-- Add configurable connect command setting.
-- Refresh README and testing guide with beginner-friendly install and troubleshooting.
-- Update extension icon.
+## 0.0.4
+
+- Add beginner-friendly setup command and guided install actions.
+- Improve missing-CLI error handling with actionable prompts.
+- Add legacy CLI migration prompts for the OpenClaw rename.
+- Refresh README with guided setup and troubleshooting.
+
+## 0.0.3
+
+- Update extension icon with circular mask.
 
 ## 0.0.1
+
 - Initial release.

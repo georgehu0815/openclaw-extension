@@ -2,12 +2,19 @@
 
 VS Code status bar shortcut for connecting to OpenClaw. It shows connection state and runs your configured OpenClaw CLI command in a terminal.
 
+Quick, super-simple overview: see `SUMMARY.md`.
+
 ## Features
 
 - Status bar indicator with idle, connecting, connected, and error states
 - One-click connection command in a dedicated terminal
+- Reuses the same terminal session for repeat connects
 - Auto-connect on startup (optional)
-- Customizable command per user environment
+- Configurable command per user environment
+- Guided setup command for installing Node.js and OpenClaw
+- One-click install actions when the CLI is missing
+- Legacy CLI name migration prompts (molt/clawdbot → openclaw)
+- Node.js presence check with install helpers
 
 ## Quick Start (macOS + Windows)
 
@@ -45,6 +52,15 @@ Scan the QR (WhatsApp) or follow the prompt for your channel.
 
 Click the `OpenClaw` status bar item. The extension sends your configured command in the terminal.
 
+## Beginner-Friendly Setup
+
+If you see a "command not found: openclaw" error in VS Code, use the built-in helpers:
+
+- Run `OpenClaw: Setup` from the Command Palette
+- Or click the action buttons in the error message to install or copy the command
+
+The setup flow can copy the install command, open docs, or run the command in a terminal after you confirm.
+
 ## Configuration
 
 - `openclaw.autoConnect`: Automatically connect on startup (default: false)
@@ -67,6 +83,16 @@ https://docs.openclaw.ai/
 
 - Reinstall CLI: `npm install -g openclaw@latest`
 - Restart your terminal or VS Code
+- Or run `OpenClaw: Setup` in VS Code to use the guided installer
+
+### Legacy CLI name (molt or clawdbot)
+
+If you previously installed the legacy CLI, update to the new `openclaw` name using the installer or npm, then run `openclaw doctor`:
+
+- Recommended (macOS/Linux): `curl -fsSL https://openclaw.bot/install.sh | bash`
+- Global npm: `npm install -g openclaw@latest`
+
+See https://docs.openclaw.ai/install/updating for full update guidance.
 
 ### "node: command not found" or Node too old
 
@@ -92,26 +118,6 @@ https://docs.openclaw.ai/
 1. Install dependencies: `bun install`
 2. Compile: `bun run compile`
 3. Press F5 to launch the Extension Development Host
-
-## Publishing
-
-1. Create or verify your Marketplace publisher matches `package.json` (`openknot`):
-   https://marketplace.visualstudio.com/
-2. Create a Personal Access Token (Azure DevOps) with Marketplace scopes:
-   https://dev.azure.com/
-   - Scopes: Marketplace → Acquire, Publish
-3. Install vsce:
-   ```
-   npm install -g @vscode/vsce
-   ```
-4. Sign in:
-   ```
-   vsce login openknot
-   ```
-5. Publish:
-   ```
-   vsce publish
-   ```
 
 ## License
 
