@@ -4,6 +4,8 @@
 
 VS Code status bar shortcut for connecting to OpenClaw. It shows connection state and runs your configured OpenClaw CLI command in a terminal.
 
+> Created by OpenKnot: https://openknot.ai
+
 Quick, super-simple overview: see `SUMMARY.md`.
 
 ## Features
