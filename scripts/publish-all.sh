@@ -26,6 +26,12 @@ cd "${ROOT_DIR}"
 echo "Running prepublish build..."
 "${PKG_CMD}" run vscode:prepublish
 
+VERSION="$(node -p "require('./package.json').version")"
+VSIX_PATH="out/openclaw-extension-${VERSION}.vsix"
+
+echo "Packaging VSIX to ${VSIX_PATH}..."
+${X_CMD} vsce package -o "${VSIX_PATH}"
+
 echo "Publishing to VS Code Marketplace (vsce)..."
 ${X_CMD} vsce publish
 
