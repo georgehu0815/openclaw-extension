@@ -1,21 +1,42 @@
 import * as vscode from 'vscode';
 import * as os from 'os';
+import * as path from 'path';
 import { exec } from 'child_process';
-import { promisify } from 'util';
+import { promisify, TextDecoder, TextEncoder } from 'util';
 
 let statusBarItem: vscode.StatusBarItem;
 let terminal: vscode.Terminal | undefined;
 let setupTerminal: vscode.Terminal | undefined;
+let hardeningTerminal: vscode.Terminal | undefined;
 let isConnecting = false;
+let hardeningProvider: HardeningTreeProvider | undefined;
 
 const execAsync = promisify(exec);
 const OPENCLAW_DOCS_URL = 'https://docs.openclaw.ai/';
+const OPENCLAW_ONBOARD_DOCS_URL = 'https://docs.openclaw.ai/start/wizard';
+const OPENCLAW_DASHBOARD_URL = 'http://127.0.0.1:18789/';
 const OPENCLAW_UPDATE_DOCS_URL = 'https://docs.openclaw.ai/install/updating';
+const OPENCLAW_SECURITY_DOCS_URL = 'https://docs.openclaw.ai/gateway/security';
 const OPENCLAW_INSTALL_SCRIPT = 'curl -fsSL https://openclaw.bot/install.sh | bash';
 const OPENCLAW_NPM_INSTALL = 'npm install -g openclaw@latest';
 const LEGACY_CLI_ALIASES = new Set(['molt', 'molt.exe', 'clawdbot', 'clawdbot.exe']);
 const STATUS_LABEL = 'OpenClaw';
 type QuickPickOption<T extends string> = vscode.QuickPickItem & { value: T };
+type HardeningMode = 'full' | 'audit' | 'auditFix';
+type AccessSummary = {
+    short: string;
+    markdown: string;
+    generatedAt: Date;
+};
+
+type AccessInfo = {
+    mcpServers: string[];
+    tools: string[];
+    keySources: string[];
+    networkEndpoints: string[];
+    localFiles: string[];
+    notes: string[];
+};
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('OpenClaw extension is now active');
@@ -44,6 +65,58 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(setupCommand);
 
+    let modelSetupCommand = vscode.commands.registerCommand('openclaw.modelSetup', async () => {
+        await runModelSetupWizard();
+    });
+    context.subscriptions.push(modelSetupCommand);
+
+    let hardenCommand = vscode.commands.registerCommand('openclaw.harden', async () => {
+        await runHardeningFlow();
+    });
+    context.subscriptions.push(hardenCommand);
+
+    let hardeningRefreshCommand = vscode.commands.registerCommand('openclaw.hardening.refresh', () => {
+        hardeningProvider?.refresh();
+    });
+    context.subscriptions.push(hardeningRefreshCommand);
+
+    let hardeningOpenConfigCommand = vscode.commands.registerCommand('openclaw.hardening.openConfig', async () => {
+        await openOpenClawConfig(true);
+    });
+    context.subscriptions.push(hardeningOpenConfigCommand);
+
+    let hardeningOpenDocsCommand = vscode.commands.registerCommand('openclaw.hardening.openDocs', async () => {
+        await openSecurityDocs();
+    });
+    context.subscriptions.push(hardeningOpenDocsCommand);
+
+    let hardeningOpenDashboardCommand = vscode.commands.registerCommand(
+        'openclaw.hardening.openDashboard',
+        async () => {
+            await openDashboard();
+        }
+    );
+    context.subscriptions.push(hardeningOpenDashboardCommand);
+
+    let hardeningRunStatusCommand = vscode.commands.registerCommand('openclaw.hardening.runStatus', async () => {
+        await runHardeningStatusCheck();
+    });
+    context.subscriptions.push(hardeningRunStatusCommand);
+
+    let hardeningAccessSummaryCommand = vscode.commands.registerCommand(
+        'openclaw.hardening.showAccessSummary',
+        async () => {
+            await showHardeningAccessSummary();
+        }
+    );
+    context.subscriptions.push(hardeningAccessSummaryCommand);
+
+    hardeningProvider = new HardeningTreeProvider();
+    const hardeningView = vscode.window.createTreeView('openclaw.hardening', {
+        treeDataProvider: hardeningProvider
+    });
+    context.subscriptions.push(hardeningView);
+
     // Check auto-connect setting
     const config = vscode.workspace.getConfiguration('openclaw');
     const autoConnect = config.get<boolean>('autoConnect', false);
@@ -63,6 +136,9 @@ export function activate(context: vscode.ExtensionContext) {
         }
         if (setupTerminal && closedTerminal === setupTerminal) {
             setupTerminal = undefined;
+        }
+        if (hardeningTerminal && closedTerminal === hardeningTerminal) {
+            hardeningTerminal = undefined;
         }
     });
     context.subscriptions.push(terminalClosedDisposable);
@@ -165,12 +241,544 @@ async function connect() {
     }
 }
 
+async function runHardeningFlow() {
+    const readiness = await ensureHardeningCommandReady();
+    if (!readiness) {
+        return;
+    }
+
+    const { prefix, mode } = readiness;
+    const commands: string[] = [];
+
+    commands.push(`${prefix} security audit`);
+    if (mode === 'auditFix' || mode === 'full') {
+        commands.push(`${prefix} security audit --fix`);
+    }
+    if (mode === 'full') {
+        commands.push(`${prefix} security audit --deep`);
+    }
+
+    const terminalInstance = getHardeningTerminal();
+    terminalInstance.show(true);
+    for (const command of commands) {
+        terminalInstance.sendText(command);
+    }
+
+    hardeningProvider?.setLastRun(new Date());
+    vscode.window.showInformationMessage('OpenClaw hardening commands sent. Review the terminal output.');
+}
+
+async function runHardeningStatusCheck() {
+    const readiness = await ensureHardeningCommandReady();
+    if (!readiness) {
+        return;
+    }
+    const terminalInstance = getHardeningTerminal();
+    terminalInstance.show(true);
+    terminalInstance.sendText(`${readiness.prefix} status --all`);
+    vscode.window.showInformationMessage('Running OpenClaw status --all.');
+}
+
+async function showHardeningAccessSummary() {
+    const readiness = await ensureHardeningCommandReady();
+    if (!readiness) {
+        return;
+    }
+
+    const summary = await buildHardeningAccessSummary(readiness.prefix);
+    hardeningProvider?.setAccessSummary(summary);
+
+    const document = await vscode.workspace.openTextDocument({
+        content: summary.markdown,
+        language: 'markdown'
+    });
+    await vscode.window.showTextDocument(document, { preview: true });
+}
+
+async function buildHardeningAccessSummary(prefix: string): Promise<AccessSummary> {
+    const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json');
+    const configResult = await readOpenClawConfig(configPath);
+    const configInfo = extractAccessInfoFromConfig(configResult.config, configPath);
+
+    const cliResult = await runStatusAll(prefix);
+    const cliInfo = extractAccessInfoFromCli(cliResult.output);
+
+    const combined = mergeAccessInfo(configInfo, cliInfo);
+    combined.networkEndpoints = uniqueList([...combined.networkEndpoints, OPENCLAW_DASHBOARD_URL]);
+
+    const short = formatAccessSummaryShort(combined, configResult.error, cliResult.error);
+    const markdown = formatAccessSummaryMarkdown(
+        combined,
+        configResult.error,
+        cliResult.error,
+        cliResult.output,
+        configPath
+    );
+
+    return { short, markdown, generatedAt: new Date() };
+}
+
+async function runStatusAll(prefix: string): Promise<{ output?: string; error?: string }> {
+    try {
+        const { stdout, stderr } = await execAsync(`${prefix} status --all`, {
+            maxBuffer: 1024 * 1024
+        });
+        const output = [stdout, stderr].filter(Boolean).join('\n').trim();
+        return { output: output.length > 0 ? output : undefined };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { error: message };
+    }
+}
+
+async function readOpenClawConfig(
+    configPath: string
+): Promise<{ config: unknown | null; error?: string }> {
+    const uri = vscode.Uri.file(configPath);
+    try {
+        const raw = await vscode.workspace.fs.readFile(uri);
+        const decoder = new TextDecoder();
+        const contents = decoder.decode(raw);
+        if (!contents.trim()) {
+            return { config: null, error: 'Config file is empty.' };
+        }
+        return { config: JSON.parse(contents) };
+    } catch (error) {
+        if (error instanceof Error && 'code' in error) {
+            return { config: null, error: 'Config file not found.' };
+        }
+        return { config: null, error: 'Unable to read config file.' };
+    }
+}
+
+function extractAccessInfoFromConfig(config: unknown, configPath: string): AccessInfo {
+    const info = createEmptyAccessInfo();
+    info.localFiles.push(configPath);
+
+    if (!isRecord(config)) {
+        return info;
+    }
+
+    info.mcpServers = extractMcpServers(config);
+    info.tools = extractTools(config);
+
+    const keySources = new Set<string>();
+    const localFiles = new Set<string>(info.localFiles);
+    const endpoints = new Set<string>();
+    const notes = new Set<string>();
+
+    scanAccessInfo(config, [], keySources, localFiles, endpoints, notes);
+
+    info.keySources = uniqueList([...keySources]);
+    info.localFiles = uniqueList([...localFiles]);
+    info.networkEndpoints = uniqueList([...endpoints]);
+    info.notes = uniqueList([...notes]);
+
+    return info;
+}
+
+function extractAccessInfoFromCli(output?: string): AccessInfo {
+    const info = createEmptyAccessInfo();
+    if (!output) {
+        return info;
+    }
+    const urls = output.match(/https?:\/\/\S+/g) ?? [];
+    info.networkEndpoints = uniqueList(urls);
+    return info;
+}
+
+function mergeAccessInfo(base: AccessInfo, extra: AccessInfo): AccessInfo {
+    return {
+        mcpServers: uniqueList([...base.mcpServers, ...extra.mcpServers]),
+        tools: uniqueList([...base.tools, ...extra.tools]),
+        keySources: uniqueList([...base.keySources, ...extra.keySources]),
+        networkEndpoints: uniqueList([...base.networkEndpoints, ...extra.networkEndpoints]),
+        localFiles: uniqueList([...base.localFiles, ...extra.localFiles]),
+        notes: uniqueList([...base.notes, ...extra.notes])
+    };
+}
+
+function formatAccessSummaryShort(info: AccessInfo, configError?: string, cliError?: string) {
+    const parts: string[] = [];
+    if (info.mcpServers.length > 0) {
+        parts.push(`MCP: ${info.mcpServers.length}`);
+    }
+    if (info.tools.length > 0) {
+        parts.push(`Tools: ${info.tools.length}`);
+    }
+    if (info.keySources.length > 0) {
+        const keyTypes = summarizeKeySources(info.keySources);
+        parts.push(`Keys: ${keyTypes}`);
+    }
+    if (parts.length === 0) {
+        parts.push('Not generated yet');
+    }
+    if (configError) {
+        parts.push('Config unavailable');
+    }
+    if (cliError) {
+        parts.push('CLI error');
+    }
+    return parts.join(' | ');
+}
+
+function formatAccessSummaryMarkdown(
+    info: AccessInfo,
+    configError?: string,
+    cliError?: string,
+    cliOutput?: string,
+    configPath?: string
+) {
+    const lines: string[] = [];
+    lines.push('# OpenClaw access summary');
+    lines.push(`Generated: ${new Date().toLocaleString()}`);
+    lines.push('');
+
+    if (configError) {
+        lines.push(`Config issue: ${configError}`);
+        lines.push('');
+    }
+    if (cliError) {
+        lines.push(`CLI issue: ${cliError}`);
+        lines.push('');
+    }
+
+    lines.push('## MCP servers');
+    lines.push(formatList(info.mcpServers, 'No MCP servers detected in config or CLI output.'));
+    lines.push('');
+
+    lines.push('## Tools');
+    lines.push(formatList(info.tools, 'No tools detected in config.'));
+    lines.push('');
+
+    lines.push('## Keys and credentials');
+    lines.push(
+        formatList(
+            info.keySources,
+            'No key sources detected. If you use environment variables, they may not appear in config.'
+        )
+    );
+    lines.push('');
+
+    lines.push('## Network endpoints');
+    lines.push(formatList(info.networkEndpoints, 'No network endpoints detected.'));
+    lines.push('');
+
+    lines.push('## Local files');
+    const files = configPath ? uniqueList([configPath, ...info.localFiles]) : info.localFiles;
+    lines.push(formatList(files, 'No local files detected.'));
+    lines.push('');
+
+    if (info.notes.length > 0) {
+        lines.push('## Notes');
+        lines.push(formatList(info.notes, ''));
+        lines.push('');
+    }
+
+    lines.push('## CLI status --all output');
+    if (cliOutput) {
+        lines.push('```');
+        lines.push(cliOutput.trim());
+        lines.push('```');
+    } else {
+        lines.push('No CLI output captured.');
+    }
+
+    return lines.join('\n');
+}
+
+function formatList(items: string[], emptyMessage: string) {
+    if (items.length === 0) {
+        return emptyMessage;
+    }
+    return items.map((item) => `- ${item}`).join('\n');
+}
+
+function createEmptyAccessInfo(): AccessInfo {
+    return {
+        mcpServers: [],
+        tools: [],
+        keySources: [],
+        networkEndpoints: [],
+        localFiles: [],
+        notes: []
+    };
+}
+
+function extractMcpServers(config: Record<string, unknown>): string[] {
+    const results = new Set<string>();
+    const mcp = config.mcp;
+    if (Array.isArray(mcp)) {
+        for (const entry of mcp) {
+            const label = formatNamedEntry(entry);
+            if (label) {
+                results.add(label);
+            }
+        }
+    }
+    if (isRecord(mcp)) {
+        const servers = mcp.servers;
+        if (Array.isArray(servers)) {
+            for (const entry of servers) {
+                const label = formatNamedEntry(entry);
+                if (label) {
+                    results.add(label);
+                }
+            }
+        } else if (isRecord(servers)) {
+            for (const [name, entry] of Object.entries(servers)) {
+                const label = formatNamedEntry(entry, name);
+                if (label) {
+                    results.add(label);
+                }
+            }
+        }
+    }
+    if (Array.isArray(config.mcpServers)) {
+        for (const entry of config.mcpServers) {
+            const label = formatNamedEntry(entry);
+            if (label) {
+                results.add(label);
+            }
+        }
+    }
+    return uniqueList([...results]);
+}
+
+function extractTools(config: Record<string, unknown>): string[] {
+    const results = new Set<string>();
+    const sources = [config.tools];
+    if (isRecord(config.mcp)) {
+        sources.push(config.mcp.tools);
+    }
+    if (isRecord(config.capabilities)) {
+        sources.push(config.capabilities.tools);
+    }
+
+    for (const source of sources) {
+        if (Array.isArray(source)) {
+            for (const entry of source) {
+                const label = formatNamedEntry(entry);
+                if (label) {
+                    results.add(label);
+                }
+            }
+        } else if (isRecord(source)) {
+            for (const [name, entry] of Object.entries(source)) {
+                const label = formatNamedEntry(entry, name);
+                if (label) {
+                    results.add(label);
+                }
+            }
+        }
+    }
+
+    return uniqueList([...results]);
+}
+
+function formatNamedEntry(entry: unknown, fallbackName?: string) {
+    if (typeof entry === 'string') {
+        return entry;
+    }
+    if (!isRecord(entry)) {
+        return fallbackName;
+    }
+    const name = asString(entry.name) ?? asString(entry.id) ?? fallbackName;
+    const endpoint = asString(entry.url) ?? asString(entry.endpoint) ?? asString(entry.host);
+    if (name && endpoint) {
+        return `${name} (${endpoint})`;
+    }
+    return name ?? endpoint ?? fallbackName ?? '';
+}
+
+function scanAccessInfo(
+    value: unknown,
+    pathSegments: string[],
+    keySources: Set<string>,
+    localFiles: Set<string>,
+    endpoints: Set<string>,
+    notes: Set<string>,
+    depth = 0
+) {
+    if (depth > 8) {
+        return;
+    }
+    if (Array.isArray(value)) {
+        value.forEach((entry, index) =>
+            scanAccessInfo(entry, [...pathSegments, String(index)], keySources, localFiles, endpoints, notes, depth + 1)
+        );
+        return;
+    }
+    if (isRecord(value)) {
+        for (const [key, entry] of Object.entries(value)) {
+            if (isKeyIndicator(key) && isRecord(entry)) {
+                const envVar = getEnvVarFromRecord(entry);
+                if (envVar) {
+                    keySources.add(`Environment variable: ${envVar}`);
+                }
+                const filePath = getFilePathFromRecord(entry);
+                if (filePath) {
+                    keySources.add(`Key file: ${filePath}`);
+                    localFiles.add(filePath);
+                }
+            }
+            scanAccessInfo(entry, [...pathSegments, key], keySources, localFiles, endpoints, notes, depth + 1);
+        }
+        return;
+    }
+    if (typeof value === 'string') {
+        if (isUrl(value)) {
+            endpoints.add(value);
+        } else if (looksLikePath(value)) {
+            localFiles.add(value);
+        }
+        if (pathSegments.some(isKeyIndicator)) {
+            const envVar = extractEnvVarName(value);
+            if (envVar) {
+                keySources.add(`Environment variable: ${envVar}`);
+                return;
+            }
+            if (looksLikePath(value)) {
+                keySources.add(`Key file: ${value}`);
+                return;
+            }
+            const pathLabel = pathSegments.join('.');
+            keySources.add(`Config value: ${pathLabel}`);
+        }
+    }
+}
+
+function summarizeKeySources(sources: string[]) {
+    const categories = new Set<string>();
+    for (const source of sources) {
+        if (source.startsWith('Environment variable:')) {
+            categories.add('env');
+        } else if (source.startsWith('Key file:')) {
+            categories.add('file');
+        } else {
+            categories.add('config');
+        }
+    }
+    return categories.size > 0 ? [...categories].sort().join(', ') : 'none';
+}
+
+function getEnvVarFromRecord(entry: Record<string, unknown>) {
+    const envValue = asString(entry.env) ?? asString(entry.envVar) ?? asString(entry.environment);
+    if (!envValue) {
+        return undefined;
+    }
+    return envValue;
+}
+
+function getFilePathFromRecord(entry: Record<string, unknown>) {
+    const fileValue = asString(entry.path) ?? asString(entry.file) ?? asString(entry.filePath);
+    if (!fileValue) {
+        return undefined;
+    }
+    if (looksLikePath(fileValue)) {
+        return fileValue;
+    }
+    return undefined;
+}
+
+function extractEnvVarName(value: string) {
+    const match =
+        value.match(/\$\{([A-Z0-9_]+)\}/) ||
+        value.match(/\$([A-Z0-9_]+)/) ||
+        value.match(/env:([A-Z0-9_]+)/i) ||
+        value.match(/ENV:([A-Z0-9_]+)/);
+    return match ? match[1] : undefined;
+}
+
+function isKeyIndicator(segment: string) {
+    return /(key|token|secret|apikey|api_key|password|credential)/i.test(segment);
+}
+
+function isUrl(value: string) {
+    return /^https?:\/\//i.test(value);
+}
+
+function looksLikePath(value: string) {
+    return /[\\/]/.test(value) && !isUrl(value);
+}
+
+function uniqueList(items: string[]) {
+    return [...new Set(items.filter((item) => item && item.trim().length > 0))].sort();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function asString(value: unknown): string | undefined {
+    return typeof value === 'string' ? value : undefined;
+}
+
+async function ensureHardeningCommandReady(): Promise<{ prefix: string; mode: HardeningMode } | null> {
+    const prefix = getHardeningCommandPrefix();
+    if (!prefix) {
+        vscode.window.showErrorMessage('OpenClaw hardening command is empty. Update OpenClaw: Hardening Command.');
+        await openHardeningSettings();
+        return null;
+    }
+
+    const executable = prefix.split(/\s+/)[0];
+    if (!executable) {
+        vscode.window.showErrorMessage('OpenClaw hardening command is invalid. Update OpenClaw: Hardening Command.');
+        await openHardeningSettings();
+        return null;
+    }
+
+    if (executable === 'openclaw' || executable === 'openclaw.exe') {
+        const hasNode = await isCommandAvailable('node');
+        if (!hasNode) {
+            await showMissingNodeMessage();
+            return null;
+        }
+    }
+
+    const available = await isCommandAvailable(executable);
+    if (!available) {
+        const action = await vscode.window.showErrorMessage(
+            `Command not found: ${executable}. Update OpenClaw: Hardening Command or install the OpenClaw CLI.`,
+            'Install CLI',
+            'Open settings'
+        );
+        if (action === 'Install CLI') {
+            await runSetupFlow();
+        } else if (action === 'Open settings') {
+            await openHardeningSettings();
+        }
+        return null;
+    }
+
+    return { prefix, mode: getHardeningMode() };
+}
+
+function getHardeningCommandPrefix() {
+    const config = vscode.workspace.getConfiguration('openclaw');
+    const prefix = (config.get<string>('hardening.command') ?? 'openclaw').trim();
+    return prefix;
+}
+
+function getHardeningMode(): HardeningMode {
+    const config = vscode.workspace.getConfiguration('openclaw');
+    const configured = (config.get<string>('hardening.mode') ?? 'full').trim();
+    if (configured === 'audit' || configured === 'auditFix' || configured === 'full') {
+        return configured;
+    }
+    return 'full';
+}
+
 export function deactivate() {
     if (terminal) {
         terminal.dispose();
     }
     if (setupTerminal) {
         setupTerminal.dispose();
+    }
+    if (hardeningTerminal) {
+        hardeningTerminal.dispose();
     }
 }
 
@@ -240,6 +848,66 @@ async function runSetupFlow() {
     }
 
     await runInstallCommand(pick.command);
+}
+
+async function runModelSetupWizard() {
+    const hasOpenClaw = await isCommandAvailable('openclaw');
+    if (!hasOpenClaw) {
+        const action = await vscode.window.showErrorMessage(
+            'OpenClaw CLI not found. Install it to run the Model Setup Wizard.',
+            'Install CLI',
+            'More options...',
+            'Cancel'
+        );
+
+        if (action === 'Install CLI') {
+            await runSetupFlow();
+        } else if (action === 'More options...') {
+            const pick = await showInstallMoreOptions();
+            if (pick === 'copy') {
+                await copyInstallCommand();
+            } else if (pick === 'docs') {
+                await openDocs();
+            } else if (pick === 'settings') {
+                await openSettings();
+            }
+        }
+        return;
+    }
+
+    const hasNode = await isCommandAvailable('node');
+    if (!hasNode) {
+        await showMissingNodeMessage();
+        return;
+    }
+
+    const onboardingPick = await showOnboardingOptions();
+    if (!onboardingPick) {
+        return;
+    }
+    if (onboardingPick === 'docs') {
+        await openOnboardDocs();
+        return;
+    }
+    if (onboardingPick === 'run' || onboardingPick === 'runNoDaemon') {
+        const command = onboardingPick === 'run' ? 'openclaw onboard --install-daemon' : 'openclaw onboard';
+        await runSetupCommand(command);
+        const continueAction = await vscode.window.showInformationMessage(
+            'Complete the OpenClaw onboarding in the terminal, then continue.',
+            'Continue'
+        );
+        if (continueAction !== 'Continue') {
+            return;
+        }
+    }
+
+    const providerPick = await showProviderOptions();
+    if (!providerPick) {
+        return;
+    }
+
+    await handleProviderSelection(providerPick);
+    await runPostSetupChecks();
 }
 
 function getInstallOptions(): Array<{
@@ -383,6 +1051,123 @@ async function runInstallCommand(command: string) {
     setupTerminal.sendText(command);
 }
 
+async function runSetupCommand(command: string) {
+    const terminalInstance = getSetupTerminal();
+    terminalInstance.show(true);
+    terminalInstance.sendText(command);
+}
+
+async function showOnboardingOptions(): Promise<'run' | 'runNoDaemon' | 'docs' | 'skip' | undefined> {
+    const items: QuickPickOption<'run' | 'runNoDaemon' | 'docs' | 'skip'>[] = [
+        {
+            label: 'Run onboarding wizard (recommended)',
+            description: 'Installs service and sets up auth, channels, and defaults',
+            detail: 'openclaw onboard --install-daemon',
+            value: 'run'
+        },
+        {
+            label: 'Run onboarding without daemon',
+            description: 'Skip background service install',
+            detail: 'openclaw onboard',
+            value: 'runNoDaemon'
+        },
+        {
+            label: 'Open onboarding docs',
+            value: 'docs'
+        },
+        {
+            label: 'Skip onboarding for now',
+            value: 'skip'
+        }
+    ];
+    const pick = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Start with onboarding (recommended)'
+    });
+    return pick?.value;
+}
+
+async function showProviderOptions(): Promise<'openai' | 'anthropic' | 'local' | undefined> {
+    const items: QuickPickOption<'openai' | 'anthropic' | 'local'>[] = [
+        {
+            label: 'OpenAI',
+            description: 'API key or OAuth-based setup',
+            value: 'openai'
+        },
+        {
+            label: 'Anthropic',
+            description: 'API key or Claude token setup',
+            value: 'anthropic'
+        },
+        {
+            label: 'Local Pi RPC (default)',
+            description: 'Use bundled Pi binary in RPC mode',
+            value: 'local'
+        }
+    ];
+    const pick = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select your model provider'
+    });
+    return pick?.value;
+}
+
+async function handleProviderSelection(provider: 'openai' | 'anthropic' | 'local') {
+    const label =
+        provider === 'openai' ? 'OpenAI' : provider === 'anthropic' ? 'Anthropic' : 'Local Pi RPC';
+    const action = await vscode.window.showQuickPick(
+        [
+            { label: `Open ${label} setup docs`, value: 'docs' },
+            { label: 'Open OpenClaw config file', value: 'config' },
+            { label: 'Open auth profiles', value: 'auth' },
+            { label: 'Skip provider setup', value: 'skip' }
+        ] as QuickPickOption<'docs' | 'config' | 'auth' | 'skip'>[],
+        { placeHolder: `Finish ${label} setup` }
+    );
+
+    if (!action) {
+        return;
+    }
+
+    if (action.value === 'docs') {
+        await openDocs();
+        return;
+    }
+
+    if (action.value === 'config') {
+        await openOpenClawConfig(true);
+        return;
+    }
+
+    if (action.value === 'auth') {
+        await openAuthProfiles();
+    }
+}
+
+async function runPostSetupChecks() {
+    const pick = await vscode.window.showQuickPick(
+        [
+            { label: 'Run status and health checks', value: 'run' },
+            { label: 'Open dashboard', value: 'dashboard' },
+            { label: 'Skip checks for now', value: 'skip' }
+        ] as QuickPickOption<'run' | 'dashboard' | 'skip'>[],
+        { placeHolder: 'Verify your OpenClaw setup' }
+    );
+
+    if (!pick || pick.value === 'skip') {
+        return;
+    }
+
+    if (pick.value === 'dashboard') {
+        await openDashboard();
+        return;
+    }
+
+    const terminalInstance = getOpenClawTerminal();
+    terminalInstance.show(true);
+    terminalInstance.sendText('openclaw status');
+    terminalInstance.sendText('openclaw health');
+    vscode.window.showInformationMessage('Running OpenClaw status and health checks.');
+}
+
 async function copyInstallCommand() {
     await vscode.env.clipboard.writeText(OPENCLAW_NPM_INSTALL);
     vscode.window.showInformationMessage('Install command copied to clipboard.');
@@ -392,8 +1177,20 @@ async function openDocs() {
     await vscode.env.openExternal(vscode.Uri.parse(OPENCLAW_DOCS_URL));
 }
 
+async function openOnboardDocs() {
+    await vscode.env.openExternal(vscode.Uri.parse(OPENCLAW_ONBOARD_DOCS_URL));
+}
+
+async function openDashboard() {
+    await vscode.env.openExternal(vscode.Uri.parse(OPENCLAW_DASHBOARD_URL));
+}
+
 async function openUpdateDocs() {
     await vscode.env.openExternal(vscode.Uri.parse(OPENCLAW_UPDATE_DOCS_URL));
+}
+
+async function openSecurityDocs() {
+    await vscode.env.openExternal(vscode.Uri.parse(OPENCLAW_SECURITY_DOCS_URL));
 }
 
 async function openNodeDocs() {
@@ -402,6 +1199,82 @@ async function openNodeDocs() {
 
 async function openSettings() {
     await vscode.commands.executeCommand('workbench.action.openSettings', 'openclaw.command');
+}
+
+async function openHardeningSettings() {
+    await vscode.commands.executeCommand('workbench.action.openSettings', 'openclaw.hardening');
+}
+
+function getSetupTerminal() {
+    if (!setupTerminal) {
+        setupTerminal = vscode.window.createTerminal('OpenClaw Setup');
+    }
+    return setupTerminal;
+}
+
+function getOpenClawTerminal() {
+    if (!terminal) {
+        terminal = vscode.window.createTerminal('OpenClaw');
+    }
+    return terminal;
+}
+
+function getHardeningTerminal() {
+    if (!hardeningTerminal) {
+        hardeningTerminal = vscode.window.createTerminal('OpenClaw Hardening');
+    }
+    return hardeningTerminal;
+}
+
+async function openOpenClawConfig(createIfMissing: boolean) {
+    const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json');
+    await openFileInEditor(configPath, createIfMissing, '{\n  \n}\n');
+}
+
+async function openAuthProfiles() {
+    const agentId = await vscode.window.showInputBox({
+        prompt: 'Enter the agent id (folder name under ~/.openclaw/agents)',
+        placeHolder: 'main'
+    });
+    if (!agentId) {
+        return;
+    }
+    const profilesPath = path.join(os.homedir(), '.openclaw', 'agents', agentId, 'agent', 'auth-profiles.json');
+    await openFileInEditor(profilesPath, true, '{\n  \n}\n');
+}
+
+async function openFileInEditor(filePath: string, createIfMissing: boolean, initialContents: string) {
+    const uri = vscode.Uri.file(filePath);
+    const exists = await fileExists(uri);
+    if (!exists && createIfMissing) {
+        await ensureParentDirectory(uri);
+        const encoder = new TextEncoder();
+        await vscode.workspace.fs.writeFile(uri, encoder.encode(initialContents));
+    }
+    try {
+        const document = await vscode.workspace.openTextDocument(uri);
+        await vscode.window.showTextDocument(document, { preview: false });
+    } catch (error) {
+        vscode.window.showErrorMessage(`Unable to open file: ${filePath}`);
+    }
+}
+
+async function fileExists(uri: vscode.Uri) {
+    try {
+        await vscode.workspace.fs.stat(uri);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function ensureParentDirectory(uri: vscode.Uri) {
+    const directory = vscode.Uri.file(path.dirname(uri.fsPath));
+    try {
+        await vscode.workspace.fs.stat(directory);
+    } catch {
+        await vscode.workspace.fs.createDirectory(directory);
+    }
 }
 
 async function showMissingNodeMessage() {
@@ -531,6 +1404,143 @@ async function showLegacyMissingOpenClawMessage(legacyExecutable: string) {
         } else if (pick === 'settings') {
             await openSettings();
         }
+    }
+}
+
+class HardeningItem extends vscode.TreeItem {
+    constructor(
+        label: string,
+        options: {
+            description?: string;
+            tooltip?: string;
+            icon?: vscode.ThemeIcon;
+            command?: vscode.Command;
+        } = {}
+    ) {
+        super(label, vscode.TreeItemCollapsibleState.None);
+        this.description = options.description;
+        this.tooltip = options.tooltip;
+        this.iconPath = options.icon;
+        this.command = options.command;
+    }
+}
+
+class HardeningTreeProvider implements vscode.TreeDataProvider<HardeningItem> {
+    private _onDidChangeTreeData = new vscode.EventEmitter<HardeningItem | undefined | null | void>();
+    readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+    private lastRun: Date | undefined;
+    private accessSummary: AccessSummary | undefined;
+
+    refresh() {
+        this._onDidChangeTreeData.fire();
+    }
+
+    setLastRun(date: Date) {
+        this.lastRun = date;
+        this.refresh();
+    }
+
+    setAccessSummary(summary: AccessSummary) {
+        this.accessSummary = summary;
+        this.refresh();
+    }
+
+    getTreeItem(element: HardeningItem) {
+        return element;
+    }
+
+    getChildren() {
+        const mode = getHardeningMode();
+        const modeLabel = mode === 'full' ? 'Full hardening' : mode === 'auditFix' ? 'Audit + fix' : 'Audit only';
+        const lastRunLabel = this.lastRun ? this.lastRun.toLocaleString() : 'Not run yet';
+        const accessSummaryLabel = this.accessSummary ? this.accessSummary.short : 'Not generated yet';
+        const accessSummaryTooltip = this.accessSummary
+            ? `Generated ${this.accessSummary.generatedAt.toLocaleString()}`
+            : 'Generate a plain-English access summary';
+
+        const steps = [
+            new HardeningItem('Audit', {
+                description: 'Runs openclaw security audit',
+                icon: new vscode.ThemeIcon('check')
+            }),
+            new HardeningItem('Fix', {
+                description: mode === 'audit' ? 'Skipped in audit-only mode' : 'Runs openclaw security audit --fix',
+                icon: new vscode.ThemeIcon(mode === 'audit' ? 'circle-slash' : 'tools')
+            }),
+            new HardeningItem('Deep', {
+                description:
+                    mode === 'full'
+                        ? 'Runs openclaw security audit --deep'
+                        : 'Skipped unless hardening mode is full',
+                icon: new vscode.ThemeIcon(mode === 'full' ? 'shield' : 'circle-slash')
+            })
+        ];
+
+        return [
+            new HardeningItem('Run Hardening', {
+                description: modeLabel,
+                tooltip: 'Run the configured OpenClaw hardening workflow',
+                icon: new vscode.ThemeIcon('shield'),
+                command: {
+                    command: 'openclaw.harden',
+                    title: 'Run OpenClaw hardening'
+                }
+            }),
+            new HardeningItem('Last Run', {
+                description: lastRunLabel,
+                icon: new vscode.ThemeIcon('clock')
+            }),
+            new HardeningItem('Access summary', {
+                description: accessSummaryLabel,
+                tooltip: accessSummaryTooltip,
+                icon: new vscode.ThemeIcon('list-unordered'),
+                command: {
+                    command: 'openclaw.hardening.showAccessSummary',
+                    title: 'Show OpenClaw access summary'
+                }
+            }),
+            ...steps,
+            new HardeningItem('Open config file', {
+                description: '~/.openclaw/openclaw.json',
+                icon: new vscode.ThemeIcon('file'),
+                command: {
+                    command: 'openclaw.hardening.openConfig',
+                    title: 'Open OpenClaw config'
+                }
+            }),
+            new HardeningItem('Open security docs', {
+                description: 'docs.openclaw.ai/gateway/security',
+                icon: new vscode.ThemeIcon('book'),
+                command: {
+                    command: 'openclaw.hardening.openDocs',
+                    title: 'Open OpenClaw security docs'
+                }
+            }),
+            new HardeningItem('Run status --all', {
+                description: 'Check gateway + agent status',
+                icon: new vscode.ThemeIcon('terminal'),
+                command: {
+                    command: 'openclaw.hardening.runStatus',
+                    title: 'Run OpenClaw status'
+                }
+            }),
+            new HardeningItem('Open dashboard', {
+                description: OPENCLAW_DASHBOARD_URL,
+                icon: new vscode.ThemeIcon('globe'),
+                command: {
+                    command: 'openclaw.hardening.openDashboard',
+                    title: 'Open OpenClaw dashboard'
+                }
+            }),
+            new HardeningItem('Refresh', {
+                description: 'Reload hardening view',
+                icon: new vscode.ThemeIcon('refresh'),
+                command: {
+                    command: 'openclaw.hardening.refresh',
+                    title: 'Refresh OpenClaw hardening view'
+                }
+            })
+        ];
     }
 }
 

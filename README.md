@@ -63,10 +63,34 @@ If you see a "command not found: openclaw" error in VS Code, use the built-in he
 
 The setup flow can also detect missing Node.js, guide you to install the latest LTS, and then install OpenClaw.
 
+## Model Setup Wizard (Powerful + Beginner-Friendly)
+
+Run the command palette action **OpenClaw: Model Setup Wizard** to:
+
+- Run the OpenClaw onboarding wizard in a terminal (`openclaw onboard`)
+- Choose a provider (`OpenAI`, `Anthropic`, or `Local Pi RPC`)
+- Open your config and auth profile files for quick edits
+- Verify health with `openclaw status` and `openclaw health`
+
+This is the fastest path from zero to a working model configuration.
+
+## Security Hardening (New)
+
+Run **OpenClaw: Harden** from the Command Palette or open the **OpenClaw → Hardening** view in the Activity Bar to:
+
+- Run `openclaw security audit`, `--fix`, and `--deep` in sequence
+- Review status in the terminal and get quick links to config + docs
+- Trigger `openclaw status --all` and open the local dashboard
+- View a plain-English access summary (MCP, tools, key sources)
+
+This is a guided path for locking down common attack surfaces and permissions.
+
 ## Configuration
 
 - `openclaw.autoConnect`: Automatically connect on startup (default: false)
 - `openclaw.command`: Command to run when connecting (default: `openclaw status`)
+- `openclaw.hardening.mode`: Hardening workflow (`full`, `audit`, `auditFix`)
+- `openclaw.hardening.command`: Command prefix for hardening (default: `openclaw`)
 
 For Windows with WSL, set: `openclaw.command` = `wsl openclaw status`
 
@@ -113,6 +137,7 @@ If you previously installed the legacy CLI, update to the new `openclaw` name us
 ### Windows + WSL
 
 - Set `openclaw.command` to `wsl openclaw status`
+- Set `openclaw.hardening.command` to `wsl openclaw`
 
 ## Development
 

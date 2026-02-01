@@ -2,7 +2,7 @@
   "name": "openclaw-extension",
   "displayName": "OpenClaw Extension",
   "description": "Status bar connector for the OpenClaw CLI",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "openknot",
   "author": {
     "name": "Val Alexander",
@@ -44,8 +44,37 @@
       {
         "command": "openclaw.setup",
         "title": "OpenClaw: Setup"
+      },
+      {
+        "command": "openclaw.modelSetup",
+        "title": "OpenClaw: Model Setup Wizard"
+      },
+      {
+        "command": "openclaw.harden",
+        "title": "OpenClaw: Harden"
+      },
+      {
+        "command": "openclaw.hardening.showAccessSummary",
+        "title": "OpenClaw: Hardening Access Summary"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "openclaw",
+          "title": "OpenClaw",
+          "icon": "assets/images/image.png"
+        }
+      ]
+    },
+    "views": {
+      "openclaw": [
+        {
+          "id": "openclaw.hardening",
+          "name": "Hardening"
+        }
+      ]
+    },
     "configuration": {
       "title": "OpenClaw",
       "properties": {
@@ -58,6 +87,17 @@
           "type": "string",
           "default": "openclaw status",
           "description": "Command to run when connecting (e.g. 'openclaw status' or 'wsl openclaw status')"
+        },
+        "openclaw.hardening.mode": {
+          "type": "string",
+          "enum": ["full", "audit", "auditFix"],
+          "default": "full",
+          "description": "Hardening workflow to run: audit only, audit + fix, or full (audit, fix, deep)"
+        },
+        "openclaw.hardening.command": {
+          "type": "string",
+          "default": "openclaw",
+          "description": "Command prefix to run OpenClaw hardening (e.g. 'openclaw' or 'wsl openclaw')"
         }
       }
     }
