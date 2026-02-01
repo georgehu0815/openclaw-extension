@@ -2,7 +2,7 @@
   "name": "openclaw-extension",
   "displayName": "OpenClaw Extension",
   "description": "Status bar connector for the OpenClaw CLI",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "publisher": "openknot",
   "author": {
     "name": "Val Alexander",
@@ -110,7 +110,7 @@
     "lint": "eslint src --ext ts",
     "publish:vsce": "vsce publish",
     "publish:ovsx": "ovsx publish -p $OVSX_TOKEN",
-    "publish:all": "npm run publish:vsce && npm run publish:ovsx"
+    "publish:all": "scripts/publish-all.sh"
   },
   "devDependencies": {
     "@types/vscode": "~1.105.0",

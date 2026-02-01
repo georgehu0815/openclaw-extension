@@ -6,6 +6,10 @@ Semantic Versioning.
 
 ## Unreleased
 
+## 0.0.7
+
+- Add a single publish script that runs prepublish and both marketplaces.
+
 ## 0.0.5
 
 - Add status bar accessibility metadata and reuse shared label formatting.

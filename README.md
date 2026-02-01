@@ -144,6 +144,7 @@ If you previously installed the legacy CLI, update to the new `openclaw` name us
 1. Install dependencies: `bun install`
 2. Compile: `bun run compile`
 3. Press F5 to launch the Extension Development Host
+4. Publish (prepublish + VSCE + Open VSX): `bun run publish:all:script`
 
 ## License
 
