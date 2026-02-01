@@ -32,4 +32,10 @@ ${X_CMD} vsce publish
 echo "Publishing to Open VSX (ovsx)..."
 ${X_CMD} ovsx publish -p "${OVSX_TOKEN}"
 
+EXT_NAME="$(node -p "require('./package.json').name")"
+PUBLISHER="$(node -p "require('./package.json').publisher")"
+
 echo "Publish complete."
+echo "Summary:"
+echo "VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=${PUBLISHER}.${EXT_NAME}"
+echo "Open VSX: https://open-vsx.org/extension/${PUBLISHER}/${EXT_NAME}"
