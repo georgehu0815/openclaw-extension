@@ -9,7 +9,7 @@ let terminal: vscode.Terminal | undefined;
 let setupTerminal: vscode.Terminal | undefined;
 let hardeningTerminal: vscode.Terminal | undefined;
 let isConnecting = false;
-let hardeningProvider: HardeningTreeProvider | undefined;
+let overviewProvider: OverviewTreeProvider | undefined;
 
 const execAsync = promisify(exec);
 const OPENCLAW_DOCS_URL = 'https://docs.openclaw.ai/';
@@ -36,6 +36,15 @@ type AccessInfo = {
     networkEndpoints: string[];
     localFiles: string[];
     notes: string[];
+};
+
+type ToolEntry = {
+    id: string;
+    label: string;
+    enabled: boolean;
+    path: Array<string | number>;
+    source: string;
+    description?: string;
 };
 
 export function activate(context: vscode.ExtensionContext) {
@@ -70,13 +79,18 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(modelSetupCommand);
 
+    let openDocsCommand = vscode.commands.registerCommand('openclaw.openDocs', async () => {
+        await openDocs();
+    });
+    context.subscriptions.push(openDocsCommand);
+
     let hardenCommand = vscode.commands.registerCommand('openclaw.harden', async () => {
         await runHardeningFlow();
     });
     context.subscriptions.push(hardenCommand);
 
-    let hardeningRefreshCommand = vscode.commands.registerCommand('openclaw.hardening.refresh', () => {
-        hardeningProvider?.refresh();
+    let hardeningRefreshCommand = vscode.commands.registerCommand('openclaw.hardening.refresh', async () => {
+        await overviewProvider?.refreshTools();
     });
     context.subscriptions.push(hardeningRefreshCommand);
 
@@ -111,11 +125,33 @@ export function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(hardeningAccessSummaryCommand);
 
-    hardeningProvider = new HardeningTreeProvider();
-    const hardeningView = vscode.window.createTreeView('openclaw.hardening', {
-        treeDataProvider: hardeningProvider
+    let toolsRefreshCommand = vscode.commands.registerCommand('openclaw.tools.refresh', async () => {
+        await overviewProvider?.refreshTools();
     });
-    context.subscriptions.push(hardeningView);
+    context.subscriptions.push(toolsRefreshCommand);
+
+    let toolsToggleCommand = vscode.commands.registerCommand(
+        'openclaw.tools.toggle',
+        async (tool: ToolEntry) => {
+            await toggleToolEntry(tool);
+        }
+    );
+    context.subscriptions.push(toolsToggleCommand);
+
+    let toolsUninstallCommand = vscode.commands.registerCommand(
+        'openclaw.tools.uninstall',
+        async (tool: ToolEntry) => {
+            await uninstallToolEntry(tool);
+        }
+    );
+    context.subscriptions.push(toolsUninstallCommand);
+
+    overviewProvider = new OverviewTreeProvider();
+    const overviewView = vscode.window.createTreeView('openclaw.overview', {
+        treeDataProvider: overviewProvider
+    });
+    context.subscriptions.push(overviewView);
+    void overviewProvider.refreshTools();
 
     // Check auto-connect setting
     const config = vscode.workspace.getConfiguration('openclaw');
@@ -264,7 +300,7 @@ async function runHardeningFlow() {
         terminalInstance.sendText(command);
     }
 
-    hardeningProvider?.setLastRun(new Date());
+    overviewProvider?.setLastRun(new Date());
     vscode.window.showInformationMessage('OpenClaw hardening commands sent. Review the terminal output.');
 }
 
@@ -286,7 +322,7 @@ async function showHardeningAccessSummary() {
     }
 
     const summary = await buildHardeningAccessSummary(readiness.prefix);
-    hardeningProvider?.setAccessSummary(summary);
+    overviewProvider?.setAccessSummary(summary);
 
     const document = await vscode.workspace.openTextDocument({
         content: summary.markdown,
@@ -296,7 +332,7 @@ async function showHardeningAccessSummary() {
 }
 
 async function buildHardeningAccessSummary(prefix: string): Promise<AccessSummary> {
-    const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json');
+    const configPath = getOpenClawConfigPath();
     const configResult = await readOpenClawConfig(configPath);
     const configInfo = extractAccessInfoFromConfig(configResult.config, configPath);
 
@@ -349,6 +385,235 @@ async function readOpenClawConfig(
         }
         return { config: null, error: 'Unable to read config file.' };
     }
+}
+
+function getOpenClawConfigPath() {
+    return path.join(os.homedir(), '.openclaw', 'openclaw.json');
+}
+
+async function loadOpenClawConfigRecord(): Promise<{
+    config: Record<string, unknown> | null;
+    error?: string;
+    path: string;
+}> {
+    const configPath = getOpenClawConfigPath();
+    const result = await readOpenClawConfig(configPath);
+    if (!result.config || !isRecord(result.config)) {
+        return {
+            config: null,
+            error: result.error ?? 'Config file not found.',
+            path: configPath
+        };
+    }
+    return { config: result.config, error: result.error, path: configPath };
+}
+
+async function writeOpenClawConfigRecord(configPath: string, config: Record<string, unknown>) {
+    const encoder = new TextEncoder();
+    const contents = `${JSON.stringify(config, null, 2)}\n`;
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(configPath), encoder.encode(contents));
+}
+
+function getValueAtPath(root: unknown, pathSegments: Array<string | number>) {
+    let current = root;
+    for (const segment of pathSegments) {
+        if (Array.isArray(current) && typeof segment === 'number') {
+            if (segment < 0 || segment >= current.length) {
+                return undefined;
+            }
+            current = current[segment];
+            continue;
+        }
+        if (isRecord(current) && typeof segment === 'string') {
+            if (!(segment in current)) {
+                return undefined;
+            }
+            current = current[segment];
+            continue;
+        }
+        return undefined;
+    }
+    return current;
+}
+
+function getParentAtPath(
+    root: unknown,
+    pathSegments: Array<string | number>
+): { parent: Record<string, unknown> | unknown[]; key: string | number } | null {
+    if (pathSegments.length === 0) {
+        return null;
+    }
+    const parentPath = pathSegments.slice(0, -1);
+    const key = pathSegments[pathSegments.length - 1];
+    const parent = getValueAtPath(root, parentPath);
+    if (Array.isArray(parent) && typeof key === 'number') {
+        return { parent, key };
+    }
+    if (isRecord(parent) && typeof key === 'string') {
+        return { parent, key };
+    }
+    return null;
+}
+
+function getToolEnabled(entry: unknown) {
+    if (isRecord(entry) && typeof entry.enabled === 'boolean') {
+        return entry.enabled;
+    }
+    return true;
+}
+
+function getToolDescription(entry: unknown) {
+    if (!isRecord(entry)) {
+        return undefined;
+    }
+    return (
+        asString(entry.description) ??
+        asString(entry.summary) ??
+        asString(entry.purpose) ??
+        asString(entry.details)
+    );
+}
+
+function collectToolEntries(config: Record<string, unknown>): ToolEntry[] {
+    const entries: ToolEntry[] = [];
+    const sources: Array<{
+        source: string;
+        basePath: Array<string | number>;
+        value: unknown;
+    }> = [
+        { source: 'tools', basePath: ['tools'], value: config.tools },
+        {
+            source: 'mcp.tools',
+            basePath: ['mcp', 'tools'],
+            value: isRecord(config.mcp) ? config.mcp.tools : undefined
+        },
+        {
+            source: 'capabilities.tools',
+            basePath: ['capabilities', 'tools'],
+            value: isRecord(config.capabilities) ? config.capabilities.tools : undefined
+        }
+    ];
+
+    for (const source of sources) {
+        if (Array.isArray(source.value)) {
+            source.value.forEach((entry, index) => {
+                const label = formatNamedEntry(entry) || `Tool ${index + 1}`;
+                entries.push({
+                    id: `${source.source}:${source.basePath.join('.')}:${index}`,
+                    label,
+                    enabled: getToolEnabled(entry),
+                    description: getToolDescription(entry),
+                    path: [...source.basePath, index],
+                    source: source.source
+                });
+            });
+        } else if (isRecord(source.value)) {
+            for (const [name, entry] of Object.entries(source.value)) {
+                const label = formatNamedEntry(entry, name) || name;
+                entries.push({
+                    id: `${source.source}:${source.basePath.join('.')}:${name}`,
+                    label,
+                    enabled: getToolEnabled(entry),
+                    description: getToolDescription(entry),
+                    path: [...source.basePath, name],
+                    source: source.source
+                });
+            }
+        }
+    }
+
+    return entries.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+async function loadToolsForOverview(): Promise<{ entries: ToolEntry[]; error?: string }> {
+    const { config, error } = await loadOpenClawConfigRecord();
+    if (!config) {
+        return { entries: [], error };
+    }
+    return { entries: collectToolEntries(config), error };
+}
+
+async function toggleToolEntry(tool: ToolEntry) {
+    const { config, error, path: configPath } = await loadOpenClawConfigRecord();
+    if (!config) {
+        vscode.window.showErrorMessage(error ?? 'OpenClaw config not found.');
+        return;
+    }
+    const parentInfo = getParentAtPath(config, tool.path);
+    if (!parentInfo) {
+        vscode.window.showErrorMessage(`Unable to locate tool "${tool.label}" in config.`);
+        return;
+    }
+    const { parent, key } = parentInfo;
+    const current =
+        Array.isArray(parent) && typeof key === 'number'
+            ? parent[key]
+            : isRecord(parent) && typeof key === 'string'
+            ? parent[key]
+            : undefined;
+    if (typeof current === 'undefined') {
+        vscode.window.showErrorMessage(`Unable to locate tool "${tool.label}" in config.`);
+        return;
+    }
+    const currentlyEnabled = getToolEnabled(current);
+    const nextEnabled = !currentlyEnabled;
+    let nextEntry = current;
+
+    if (typeof current === 'string') {
+        if (!nextEnabled) {
+            nextEntry = { name: current, enabled: false };
+        }
+    } else if (isRecord(current)) {
+        nextEntry = { ...current, enabled: nextEnabled };
+    } else {
+        vscode.window.showErrorMessage(`Tool "${tool.label}" has an unsupported format.`);
+        return;
+    }
+
+    if (Array.isArray(parent) && typeof key === 'number') {
+        parent[key] = nextEntry as unknown;
+    } else if (isRecord(parent) && typeof key === 'string') {
+        parent[key] = nextEntry as unknown;
+    }
+
+    await writeOpenClawConfigRecord(configPath, config);
+    overviewProvider?.refreshTools();
+    vscode.window.showInformationMessage(
+        `${nextEnabled ? 'Enabled' : 'Disabled'} tool "${tool.label}".`
+    );
+}
+
+async function uninstallToolEntry(tool: ToolEntry) {
+    const { config, error, path: configPath } = await loadOpenClawConfigRecord();
+    if (!config) {
+        vscode.window.showErrorMessage(error ?? 'OpenClaw config not found.');
+        return;
+    }
+    const parentInfo = getParentAtPath(config, tool.path);
+    if (!parentInfo) {
+        vscode.window.showErrorMessage(`Unable to locate tool "${tool.label}" in config.`);
+        return;
+    }
+
+    const action = await vscode.window.showWarningMessage(
+        `Remove "${tool.label}" from OpenClaw tools?`,
+        { modal: true },
+        'Remove'
+    );
+    if (action !== 'Remove') {
+        return;
+    }
+
+    const { parent, key } = parentInfo;
+    if (Array.isArray(parent) && typeof key === 'number') {
+        parent.splice(key, 1);
+    } else if (isRecord(parent) && typeof key === 'string') {
+        delete parent[key];
+    }
+
+    await writeOpenClawConfigRecord(configPath, config);
+    overviewProvider?.refreshTools();
+    vscode.window.showInformationMessage(`Removed tool "${tool.label}".`);
 }
 
 function extractAccessInfoFromConfig(config: unknown, configPath: string): AccessInfo {
@@ -1227,7 +1492,7 @@ function getHardeningTerminal() {
 }
 
 async function openOpenClawConfig(createIfMissing: boolean) {
-    const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json');
+    const configPath = getOpenClawConfigPath();
     await openFileInEditor(configPath, createIfMissing, '{\n  \n}\n');
 }
 
@@ -1407,7 +1672,9 @@ async function showLegacyMissingOpenClawMessage(legacyExecutable: string) {
     }
 }
 
-class HardeningItem extends vscode.TreeItem {
+class OverviewItem extends vscode.TreeItem {
+    readonly children?: OverviewItem[];
+
     constructor(
         label: string,
         options: {
@@ -1415,24 +1682,41 @@ class HardeningItem extends vscode.TreeItem {
             tooltip?: string;
             icon?: vscode.ThemeIcon;
             command?: vscode.Command;
+            children?: OverviewItem[];
+            collapsibleState?: vscode.TreeItemCollapsibleState;
         } = {}
     ) {
-        super(label, vscode.TreeItemCollapsibleState.None);
+        const collapsibleState =
+            options.collapsibleState ??
+            (options.children && options.children.length > 0
+                ? vscode.TreeItemCollapsibleState.Collapsed
+                : vscode.TreeItemCollapsibleState.None);
+        super(label, collapsibleState);
         this.description = options.description;
         this.tooltip = options.tooltip;
         this.iconPath = options.icon;
         this.command = options.command;
+        this.children = options.children;
     }
 }
 
-class HardeningTreeProvider implements vscode.TreeDataProvider<HardeningItem> {
-    private _onDidChangeTreeData = new vscode.EventEmitter<HardeningItem | undefined | null | void>();
+class OverviewTreeProvider implements vscode.TreeDataProvider<OverviewItem> {
+    private _onDidChangeTreeData = new vscode.EventEmitter<OverviewItem | undefined | null | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
     private lastRun: Date | undefined;
     private accessSummary: AccessSummary | undefined;
+    private toolEntries: ToolEntry[] = [];
+    private toolsError: string | undefined;
 
     refresh() {
         this._onDidChangeTreeData.fire();
+    }
+
+    async refreshTools() {
+        const { entries, error } = await loadToolsForOverview();
+        this.toolEntries = entries;
+        this.toolsError = error;
+        this.refresh();
     }
 
     setLastRun(date: Date) {
@@ -1445,102 +1729,225 @@ class HardeningTreeProvider implements vscode.TreeDataProvider<HardeningItem> {
         this.refresh();
     }
 
-    getTreeItem(element: HardeningItem) {
+    getTreeItem(element: OverviewItem) {
         return element;
     }
 
-    getChildren() {
-        const mode = getHardeningMode();
-        const modeLabel = mode === 'full' ? 'Full hardening' : mode === 'auditFix' ? 'Audit + fix' : 'Audit only';
-        const lastRunLabel = this.lastRun ? this.lastRun.toLocaleString() : 'Not run yet';
-        const accessSummaryLabel = this.accessSummary ? this.accessSummary.short : 'Not generated yet';
+    getChildren(element?: OverviewItem) {
+        if (element) {
+            return element.children ?? [];
+        }
+        return [
+            this.buildGettingStartedSection(),
+            this.buildOperateSection(),
+            this.buildHardeningSection(),
+            this.buildToolsSection(),
+            this.buildHelpSection()
+        ];
+    }
+
+    private buildGettingStartedSection() {
+        return new OverviewItem('Getting Started', {
+            icon: new vscode.ThemeIcon('rocket'),
+            collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
+            children: [
+                new OverviewItem('Connect', {
+                    description: 'Run your OpenClaw command',
+                    icon: new vscode.ThemeIcon('plug'),
+                    command: {
+                        command: 'openclaw.connect',
+                        title: 'OpenClaw Connect'
+                    }
+                }),
+                new OverviewItem('Setup', {
+                    description: 'Install Node + OpenClaw',
+                    icon: new vscode.ThemeIcon('tools'),
+                    command: {
+                        command: 'openclaw.setup',
+                        title: 'OpenClaw Setup'
+                    }
+                }),
+                new OverviewItem('Model Setup Wizard', {
+                    description: 'Onboard + choose provider',
+                    icon: new vscode.ThemeIcon('settings-gear'),
+                    command: {
+                        command: 'openclaw.modelSetup',
+                        title: 'OpenClaw Model Setup Wizard'
+                    }
+                })
+            ]
+        });
+    }
+
+    private buildOperateSection() {
+        return new OverviewItem('Operate', {
+            icon: new vscode.ThemeIcon('dashboard'),
+            children: [
+                new OverviewItem('Run status', {
+                    description: 'Check gateway + agent status',
+                    icon: new vscode.ThemeIcon('terminal'),
+                    command: {
+                        command: 'openclaw.hardening.runStatus',
+                        title: 'Run OpenClaw status'
+                    }
+                }),
+                new OverviewItem('Open dashboard', {
+                    description: OPENCLAW_DASHBOARD_URL,
+                    icon: new vscode.ThemeIcon('globe'),
+                    command: {
+                        command: 'openclaw.hardening.openDashboard',
+                        title: 'Open OpenClaw dashboard'
+                    }
+                }),
+                new OverviewItem('Open config', {
+                    description: '~/.openclaw/openclaw.json',
+                    icon: new vscode.ThemeIcon('file'),
+                    command: {
+                        command: 'openclaw.hardening.openConfig',
+                        title: 'Open OpenClaw config'
+                    }
+                })
+            ]
+        });
+    }
+
+    private buildHardeningSection() {
         const accessSummaryTooltip = this.accessSummary
             ? `Generated ${this.accessSummary.generatedAt.toLocaleString()}`
             : 'Generate a plain-English access summary';
+        const mode = getHardeningMode();
+        const modeLabel = mode === 'full' ? 'Audit / Fix / Deep' : mode === 'auditFix' ? 'Audit / Fix' : 'Audit';
+        const lastRunTooltip = this.lastRun ? `Last run ${this.lastRun.toLocaleString()}` : undefined;
 
-        const steps = [
-            new HardeningItem('Audit', {
-                description: 'Runs openclaw security audit',
-                icon: new vscode.ThemeIcon('check')
-            }),
-            new HardeningItem('Fix', {
-                description: mode === 'audit' ? 'Skipped in audit-only mode' : 'Runs openclaw security audit --fix',
-                icon: new vscode.ThemeIcon(mode === 'audit' ? 'circle-slash' : 'tools')
-            }),
-            new HardeningItem('Deep', {
-                description:
-                    mode === 'full'
-                        ? 'Runs openclaw security audit --deep'
-                        : 'Skipped unless hardening mode is full',
-                icon: new vscode.ThemeIcon(mode === 'full' ? 'shield' : 'circle-slash')
-            })
-        ];
+        return new OverviewItem('Hardening', {
+            icon: new vscode.ThemeIcon('shield'),
+            children: [
+                new OverviewItem('Run hardening', {
+                    description: modeLabel,
+                    tooltip: lastRunTooltip ?? 'Run the configured OpenClaw hardening workflow',
+                    icon: new vscode.ThemeIcon('shield'),
+                    command: {
+                        command: 'openclaw.harden',
+                        title: 'Run OpenClaw hardening'
+                    }
+                }),
+                new OverviewItem('Access summary', {
+                    description: 'Plain-English permissions',
+                    tooltip: accessSummaryTooltip,
+                    icon: new vscode.ThemeIcon('list-unordered'),
+                    command: {
+                        command: 'openclaw.hardening.showAccessSummary',
+                        title: 'Show OpenClaw access summary'
+                    }
+                }),
+                new OverviewItem('Open security docs', {
+                    description: 'docs.openclaw.ai/gateway/security',
+                    icon: new vscode.ThemeIcon('book'),
+                    command: {
+                        command: 'openclaw.hardening.openDocs',
+                        title: 'Open OpenClaw security docs'
+                    }
+                })
+            ]
+        });
+    }
 
-        return [
-            new HardeningItem('Run Hardening', {
-                description: modeLabel,
-                tooltip: 'Run the configured OpenClaw hardening workflow',
-                icon: new vscode.ThemeIcon('shield'),
-                command: {
-                    command: 'openclaw.harden',
-                    title: 'Run OpenClaw hardening'
-                }
-            }),
-            new HardeningItem('Last Run', {
-                description: lastRunLabel,
-                icon: new vscode.ThemeIcon('clock')
-            }),
-            new HardeningItem('Access summary', {
-                description: accessSummaryLabel,
-                tooltip: accessSummaryTooltip,
-                icon: new vscode.ThemeIcon('list-unordered'),
-                command: {
-                    command: 'openclaw.hardening.showAccessSummary',
-                    title: 'Show OpenClaw access summary'
-                }
-            }),
-            ...steps,
-            new HardeningItem('Open config file', {
-                description: '~/.openclaw/openclaw.json',
-                icon: new vscode.ThemeIcon('file'),
-                command: {
-                    command: 'openclaw.hardening.openConfig',
-                    title: 'Open OpenClaw config'
-                }
-            }),
-            new HardeningItem('Open security docs', {
-                description: 'docs.openclaw.ai/gateway/security',
-                icon: new vscode.ThemeIcon('book'),
-                command: {
-                    command: 'openclaw.hardening.openDocs',
-                    title: 'Open OpenClaw security docs'
-                }
-            }),
-            new HardeningItem('Run status --all', {
-                description: 'Check gateway + agent status',
-                icon: new vscode.ThemeIcon('terminal'),
-                command: {
-                    command: 'openclaw.hardening.runStatus',
-                    title: 'Run OpenClaw status'
-                }
-            }),
-            new HardeningItem('Open dashboard', {
-                description: OPENCLAW_DASHBOARD_URL,
-                icon: new vscode.ThemeIcon('globe'),
-                command: {
-                    command: 'openclaw.hardening.openDashboard',
-                    title: 'Open OpenClaw dashboard'
-                }
-            }),
-            new HardeningItem('Refresh', {
-                description: 'Reload hardening view',
+    private buildToolsSection() {
+        const children: OverviewItem[] = [];
+
+        if (this.toolsError) {
+            children.push(
+                new OverviewItem('Config issue', {
+                    description: this.toolsError,
+                    icon: new vscode.ThemeIcon('warning')
+                })
+            );
+        }
+
+        if (this.toolEntries.length === 0) {
+            children.push(
+                new OverviewItem('No tools found', {
+                    description: 'Add tools in ~/.openclaw/openclaw.json',
+                    icon: new vscode.ThemeIcon('circle-slash')
+                })
+            );
+        }
+
+        for (const tool of this.toolEntries) {
+            const toggleLabel = tool.enabled ? 'Disable' : 'Enable';
+            const toggleIcon = tool.enabled ? new vscode.ThemeIcon('circle-slash') : new vscode.ThemeIcon('plug');
+            const tooltipParts = [];
+            if (tool.description) {
+                tooltipParts.push(tool.description);
+            }
+            tooltipParts.push(`Source: ${tool.source}`);
+            const toolItem = new OverviewItem(tool.label, {
+                description: tool.enabled ? 'Enabled' : 'Disabled',
+                tooltip: tooltipParts.join('\n'),
+                icon: tool.enabled ? new vscode.ThemeIcon('plug') : new vscode.ThemeIcon('circle-slash'),
+                children: [
+                    new OverviewItem(toggleLabel, {
+                        description: `${toggleLabel} this tool`,
+                        icon: toggleIcon,
+                        command: {
+                            command: 'openclaw.tools.toggle',
+                            title: `${toggleLabel} tool`,
+                            arguments: [tool]
+                        }
+                    }),
+                    new OverviewItem('Uninstall', {
+                        description: 'Remove from config',
+                        icon: new vscode.ThemeIcon('trash'),
+                        command: {
+                            command: 'openclaw.tools.uninstall',
+                            title: 'Uninstall tool',
+                            arguments: [tool]
+                        }
+                    })
+                ]
+            });
+            children.push(toolItem);
+        }
+
+        children.push(
+            new OverviewItem('Refresh tools', {
+                description: 'Reload tools from config',
                 icon: new vscode.ThemeIcon('refresh'),
                 command: {
-                    command: 'openclaw.hardening.refresh',
-                    title: 'Refresh OpenClaw hardening view'
+                    command: 'openclaw.tools.refresh',
+                    title: 'Refresh tools'
                 }
             })
-        ];
+        );
+
+        return new OverviewItem('Tools', {
+            icon: new vscode.ThemeIcon('wrench'),
+            children
+        });
+    }
+
+    private buildHelpSection() {
+        return new OverviewItem('Help', {
+            icon: new vscode.ThemeIcon('question'),
+            children: [
+                new OverviewItem('Open docs', {
+                    description: 'docs.openclaw.ai',
+                    icon: new vscode.ThemeIcon('book'),
+                    command: {
+                        command: 'openclaw.openDocs',
+                        title: 'Open OpenClaw docs'
+                    }
+                }),
+                new OverviewItem('Refresh view', {
+                    description: 'Reload items',
+                    icon: new vscode.ThemeIcon('refresh'),
+                    command: {
+                        command: 'openclaw.hardening.refresh',
+                        title: 'Refresh OpenClaw view'
+                    }
+                })
+            ]
+        });
     }
 }
 

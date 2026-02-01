@@ -6,26 +6,53 @@ Semantic Versioning.
 
 ## Unreleased
 
+## 0.0.8
+
+- Replace the Hardening activity view with a nested Overview view that groups onboarding, operations, hardening, tools, and help.
+- Add a Tools section that reads `~/.openclaw/openclaw.json` and lists tools from `tools`, `mcp.tools`, and `capabilities.tools`.
+- Support per-tool enable/disable by updating `enabled` in config entries.
+- Add uninstall for tools by removing their config entries with confirmation.
+- Surface tool descriptions and source location in the tree item tooltips.
+- Add quick access to docs, dashboard, config, and hardening actions within the Overview view.
+
 ## 0.0.7
 
-- Add a single publish script that runs prepublish and both marketplaces.
+- Add a single publish script that runs prepublish plus VS Code Marketplace and Open VSX publishes.
+- Consolidate publishing into one command for repeatable release flow.
+
+## 0.0.6
+
+- Add the Model Setup Wizard command to run onboarding, pick providers, and open config/auth profiles.
+- Introduce the Security Hardening command with audit, fix, deep, and access summary workflows.
+- Add the OpenClaw activity bar container and Hardening view entry.
+- Add hardening configuration settings for mode and command prefix.
+- Update the README with model setup, security hardening, and WSL hardening guidance.
+- Add an Open VSX publish script with .env token loading and prepublish build.
 
 ## 0.0.5
 
-- Add status bar accessibility metadata and reuse shared label formatting.
-- Consolidate install/migration prompts into "More options" quick picks.
+- Add status bar accessibility metadata for screen readers.
+- Reuse shared label formatting to keep status bar updates consistent.
+- Consolidate install and migration prompts into a "More options" quick pick.
+- Offer install, docs, or settings shortcuts from error prompts.
 
 ## 0.0.4
 
-- Add beginner-friendly setup command and guided install actions.
-- Improve missing-CLI error handling with actionable prompts.
+- Add the beginner-friendly setup command and guided install actions when the CLI is missing.
+- Improve missing-CLI error handling with direct install, copy, docs, and settings actions.
 - Add legacy CLI migration prompts for the OpenClaw rename.
-- Refresh README with guided setup and troubleshooting.
+- Include Node.js detection with guidance for installs when required.
+- Refresh README with guided setup and troubleshooting steps.
 
 ## 0.0.3
 
-- Update extension icon with circular mask.
+Whoopsies, did not publish.
+
+## 0.0.2
+
+- Update the extension icon with a circular mask for the marketplace.
+- Align visual branding with the OpenClaw assets.
 
 ## 0.0.1
 
-- Initial release.
+- Initial release with status bar connect workflow.
