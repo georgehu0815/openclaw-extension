@@ -6,6 +6,10 @@ Semantic Versioning.
 
 ## Unreleased
 
+## 0.0.9
+
+- Patch release.
+
 ## 0.0.8
 
 - Replace the Hardening activity view with a nested Overview view that groups onboarding, operations, hardening, tools, and help.
