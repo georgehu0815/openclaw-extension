@@ -1,18 +1,18 @@
 {
-  "name": "openclaw-extension",
-  "displayName": "OpenClaw Extension",
-  "description": "Status bar connector for the OpenClaw CLI",
-  "version": "0.0.9",
-  "publisher": "openknot",
+  "name": "clawdbot-extension",
+  "displayName": "Clawdbot Extension",
+  "description": "Status bar connector for the Clawdbot CLI",
+  "version": "1.0.1",
+  "publisher": "ghu",
   "author": {
-    "name": "Val Alexander",
-    "email": "val@openknot.ai"
+    "name": "ghu",
+    "email": "ghu@local"
   },
   "license": "MIT",
-  "homepage": "https://github.com/openknots/openclaw-extension",
+  "homepage": "https://github.com/ghu/clawdbot-extension",
   "repository": {
     "type": "git",
-    "url": "https://github.com/openknots/openclaw-extension.git"
+    "url": "https://github.com/ghu/clawdbot-extension.git"
   },
   "icon": "assets/images/image.png",
   "engines": {
@@ -25,10 +25,10 @@
   "keywords": [
     "ai",
     "cli",
-    "openclaw",
-    "openknot",
     "clawdbot",
-    "moltbot",
+    "whatsapp",
+    "gateway",
+    "agent",
     "vscode"
   ],
   "activationEvents": [
@@ -38,66 +38,69 @@
   "contributes": {
     "commands": [
       {
-        "command": "openclaw.connect",
-        "title": "OpenClaw: Connect"
+        "command": "clawdbot.connect",
+        "title": "Clawdbot: Connect"
       },
       {
-        "command": "openclaw.setup",
-        "title": "OpenClaw: Setup"
+        "command": "clawdbot.setup",
+        "title": "Clawdbot: Setup"
       },
       {
-        "command": "openclaw.modelSetup",
-        "title": "OpenClaw: Model Setup Wizard"
+        "command": "clawdbot.modelSetup",
+        "title": "Clawdbot: Model Setup Wizard"
       },
       {
-        "command": "openclaw.harden",
-        "title": "OpenClaw: Harden"
+        "command": "clawdbot.gateway",
+        "title": "Clawdbot: Start Gateway"
       },
       {
-        "command": "openclaw.hardening.showAccessSummary",
-        "title": "OpenClaw: Hardening Access Summary"
+        "command": "clawdbot.status",
+        "title": "Clawdbot: Show Status"
+      },
+      {
+        "command": "clawdbot.tui",
+        "title": "Clawdbot: Run TUI"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "openclaw",
-          "title": "OpenClaw",
+          "id": "clawdbot",
+          "title": "Clawdbot",
           "icon": "assets/icons/openclaw.svg"
         }
       ]
     },
     "views": {
-      "openclaw": [
+      "clawdbot": [
         {
-          "id": "openclaw.overview",
+          "id": "clawdbot.overview",
           "name": "Overview"
         }
       ]
     },
     "configuration": {
-      "title": "OpenClaw",
+      "title": "Clawdbot",
       "properties": {
-        "openclaw.autoConnect": {
+        "clawdbot.autoConnect": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically connect to OpenClaw on startup"
+          "description": "Automatically connect to Clawdbot on startup"
         },
-        "openclaw.command": {
+        "clawdbot.command": {
           "type": "string",
-          "default": "openclaw status",
-          "description": "Command to run when connecting (e.g. 'openclaw status' or 'wsl openclaw status')"
+          "default": "clawdbot status",
+          "description": "Command to run when connecting (e.g. 'clawdbot status' or 'clawdbot gateway')"
         },
-        "openclaw.hardening.mode": {
+        "clawdbot.clawdbotPath": {
           "type": "string",
-          "enum": ["full", "audit", "auditFix"],
-          "default": "full",
-          "description": "Hardening workflow to run: audit only, audit + fix, or full (audit, fix, deep)"
+          "default": "/Users/ghu/aiworker/clawdbot",
+          "description": "Path to the clawdbot project directory"
         },
-        "openclaw.hardening.command": {
-          "type": "string",
-          "default": "openclaw",
-          "description": "Command prefix to run OpenClaw hardening (e.g. 'openclaw' or 'wsl openclaw')"
+        "clawdbot.gatewayPort": {
+          "type": "number",
+          "default": 18789,
+          "description": "Port number for the Clawdbot gateway server"
         }
       }
     }
@@ -108,7 +111,7 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "installLocal": "cursor --install-extension ./out/openclaw-extension.vsix",
+    "installLocal": "code --install-extension ./clawdbot-extension-1.0.1.vsix",
     "publish:vsce": "vsce publish",
     "publish:ovsx": "ovsx publish -p $OVSX_TOKEN",
     "publish:all": "scripts/publish-all.sh"
