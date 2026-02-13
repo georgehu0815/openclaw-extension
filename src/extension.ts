@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { ChatPanelProvider } from './chatPanel';
 
 let statusBarItem: vscode.StatusBarItem;
 let terminal: vscode.Terminal | undefined;
@@ -54,6 +55,11 @@ export function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(
         vscode.commands.registerCommand('clawdbot.openDocs', async () => await openDocs())
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('clawdbot.openChat', () => {
+            ChatPanelProvider.createOrShow(context.extensionUri);
+        })
     );
 
     // Create overview tree provider
@@ -416,6 +422,14 @@ class OverviewTreeProvider implements vscode.TreeDataProvider<OverviewItem> {
         return new OverviewItem('Operate', {
             icon: new vscode.ThemeIcon('dashboard'),
             children: [
+                new OverviewItem('Open Chat Panel', {
+                    description: 'Interactive chat interface',
+                    icon: new vscode.ThemeIcon('comment-discussion'),
+                    command: {
+                        command: 'clawdbot.openChat',
+                        title: 'Open Chat Panel'
+                    }
+                }),
                 new OverviewItem('Start Gateway', {
                     description: 'Launch Clawdbot gateway server',
                     icon: new vscode.ThemeIcon('server'),

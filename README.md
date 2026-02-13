@@ -43,8 +43,8 @@ clawdbot --version
 Or install locally for development:
 ```bash
 cd /path/to/clawdbot-extension
-npm install
-npm run compile
+pnpm install
+pnpm run compile
 code --install-extension ./clawdbot-extension-1.0.0.vsix
 ```
 
@@ -250,34 +250,173 @@ mkdir -p ~/.clawdbot
 
 ## Development
 
-### Build the Extension
+### Complete Build and Install Guide
+
+Follow these steps to compile, package, and install the extension locally:
+
+#### 1. Prerequisites
+
+First, ensure you have the required tools installed:
 
 ```bash
-cd /Users/ghu/aiworker/openclaw-extension
+# Install dependencies (if not already done)
 npm install
+
+# Install vsce globally for packaging
+npm install -g @vscode/vsce
+```
+
+#### 2. Update Version (Optional)
+
+If you're releasing a new version, update the version number in [package.json](package.json):
+
+```json
+{
+  "version": "1.0.3"  // Increment as needed
+}
+```
+
+Also update the `installLocal` script to match:
+
+```json
+{
+  "scripts": {
+    "installLocal": "code --install-extension ./clawdbot-extension-1.0.3.vsix"
+  }
+}
+```
+
+#### 3. Compile TypeScript
+
+Compile the TypeScript source code to JavaScript:
+
+```bash
 npm run compile
 ```
 
-### Package as VSIX
+This runs `tsc -p ./` and outputs compiled files to the `out/` directory.
 
+**Watch mode** (auto-recompile on changes):
 ```bash
-npm install -g vsce
-vsce package
+npm run watch
 ```
 
-This creates `clawdbot-extension-1.0.0.vsix`
+#### 4. Package as VSIX
 
-### Install Locally
+Package the extension into a `.vsix` file:
 
 ```bash
-code --install-extension ./clawdbot-extension-1.0.1.vsix
+npx vsce package --no-dependencies
 ```
 
-### Debug
+This creates `clawdbot-extension-1.0.3.vsix` (or whatever version you specified).
+
+**Note**: The `--no-dependencies` flag skips dependency checks, which is useful when you have dev dependencies that aren't needed in the packaged extension.
+
+#### 5. Install Locally
+
+Install the packaged extension in VS Code:
+
+```bash
+# Install the extension
+code --install-extension ./clawdbot-extension-1.0.3.vsix
+
+# Or use the npm script
+npm run installLocal
+```
+
+#### 6. Reload VS Code
+
+After installation, reload VS Code to activate the new version:
+
+- Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux)
+- Type "Developer: Reload Window"
+- Press Enter
+
+Alternatively, restart VS Code completely.
+
+### Quick Install Script
+
+For convenience, you can run all steps at once:
+
+```bash
+# Update version, compile, package, and install
+VERSION="1.0.3"
+
+# Compile TypeScript
+npm run compile
+
+# Package extension
+npx vsce package --no-dependencies
+
+# Install in VS Code
+code --install-extension ./clawdbot-extension-${VERSION}.vsix
+
+# Reload VS Code (you'll need to do this manually)
+echo "✅ Extension installed! Press Cmd+Shift+P → 'Developer: Reload Window'"
+```
+
+### Uninstall Extension
+
+To uninstall the extension:
+
+```bash
+# Find the extension ID
+code --list-extensions | grep clawdbot
+
+# Uninstall
+code --uninstall-extension ghu.clawdbot-extension
+```
+
+### Debug Mode
+
+For development and debugging:
 
 1. Open this project in VS Code
 2. Press `F5` to launch Extension Development Host
 3. Test the extension in the new window
+4. Use `console.log()` statements - they appear in the Debug Console
+5. Set breakpoints in the TypeScript source files
+
+### Development Workflow
+
+**Recommended workflow** when making changes:
+
+1. Make your code changes
+2. Run `npm run compile` or keep `npm run watch` running
+3. Press `F5` to test in Extension Development Host
+4. Once satisfied, package with `npx vsce package --no-dependencies`
+5. Install with `code --install-extension ./clawdbot-extension-x.x.x.vsix`
+6. Reload VS Code
+
+### Common Issues
+
+**TypeScript compilation errors:**
+```bash
+# Clean and rebuild
+rm -rf out/
+npm run compile
+```
+
+**Extension not updating:**
+```bash
+# Uninstall old version first
+code --uninstall-extension ghu.clawdbot-extension
+
+# Reinstall new version
+code --install-extension ./clawdbot-extension-1.0.4.vsix
+
+# Reload VS Code
+```
+
+**VSCE packaging errors:**
+```bash
+# Use --no-dependencies flag to skip dependency validation
+npx vsce package --no-dependencies
+
+# Or install missing dependencies
+npm install
+```
 
 ## Contributing
 

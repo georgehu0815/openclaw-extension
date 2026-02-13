@@ -1,0 +1,338 @@
+
+{
+  "runId": "bfe2fcb1-c237-4696-b8fb-af9c0f704102",
+  "status": "ok",
+  "summary": "completed",
+  "result": {
+    "payloads": [
+      {
+        "text": "Hey there 🤍 What’s up?",
+        "mediaUrl": null
+      }
+    ],
+    "meta": {
+      "durationMs": 1919,
+      "agentMeta": {
+        "sessionId": "1234",
+        "provider": "azureopenai",
+        "model": "gpt-5.2",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "aborted": false,
+      "systemPromptReport": {
+        "source": "run",
+        "generatedAt": 1770947797624,
+        "sessionId": "1234",
+        "sessionKey": "agent:main:main",
+        "provider": "azureopenai",
+        "model": "gpt-5.2",
+        "workspaceDir": "/Users/ghu/clawd",
+        "bootstrapMaxChars": 20000,
+        "sandbox": {
+          "mode": "off",
+          "sandboxed": false
+        },
+        "systemPrompt": {
+          "chars": 32371,
+          "projectContextChars": 13052,
+          "nonProjectContextChars": 19319
+        },
+        "injectedWorkspaceFiles": [
+          {
+            "name": "AGENTS.md",
+            "path": "/Users/ghu/clawd/AGENTS.md",
+            "missing": false,
+            "rawChars": 7783,
+            "injectedChars": 7783,
+            "truncated": false
+          },
+          {
+            "name": "SOUL.md",
+            "path": "/Users/ghu/clawd/SOUL.md",
+            "missing": false,
+            "rawChars": 1664,
+            "injectedChars": 1664,
+            "truncated": false
+          },
+          {
+            "name": "TOOLS.md",
+            "path": "/Users/ghu/clawd/TOOLS.md",
+            "missing": false,
+            "rawChars": 848,
+            "injectedChars": 848,
+            "truncated": false
+          },
+          {
+            "name": "IDENTITY.md",
+            "path": "/Users/ghu/clawd/IDENTITY.md",
+            "missing": false,
+            "rawChars": 140,
+            "injectedChars": 140,
+            "truncated": false
+          },
+          {
+            "name": "USER.md",
+            "path": "/Users/ghu/clawd/USER.md",
+            "missing": false,
+            "rawChars": 478,
+            "injectedChars": 478,
+            "truncated": false
+          },
+          {
+            "name": "HEARTBEAT.md",
+            "path": "/Users/ghu/clawd/HEARTBEAT.md",
+            "missing": false,
+            "rawChars": 371,
+            "injectedChars": 371,
+            "truncated": false
+          },
+          {
+            "name": "BOOTSTRAP.md",
+            "path": "/Users/ghu/clawd/BOOTSTRAP.md",
+            "missing": false,
+            "rawChars": 1444,
+            "injectedChars": 1444,
+            "truncated": false
+          }
+        ],
+        "skills": {
+          "promptChars": 14485,
+          "entries": [
+            {
+              "name": "1password",
+              "blockChars": 337
+            },
+            {
+              "name": "apple-notes",
+              "blockChars": 364
+            },
+            {
+              "name": "apple-reminders",
+              "blockChars": 314
+            },
+            {
+              "name": "azure-diagrams",
+              "blockChars": 594
+            },
+            {
+              "name": "bear-notes",
+              "blockChars": 213
+            },
+            {
+              "name": "bird",
+              "blockChars": 221
+            },
+            {
+              "name": "blogwatcher",
+              "blockChars": 232
+            },
+            {
+              "name": "blucli",
+              "blockChars": 213
+            },
+            {
+              "name": "bluebubbles",
+              "blockChars": 284
+            },
+            {
+              "name": "camsnap",
+              "blockChars": 201
+            },
+            {
+              "name": "catalog-lookup-http",
+              "blockChars": 385
+            },
+            {
+              "name": "clawdhub",
+              "blockChars": 426
+            },
+            {
+              "name": "coding-agent",
+              "blockChars": 268
+            },
+            {
+              "name": "eightctl",
+              "blockChars": 221
+            },
+            {
+              "name": "file-organizer",
+              "blockChars": 352
+            },
+            {
+              "name": "gemini",
+              "blockChars": 210
+            },
+            {
+              "name": "gifgrep",
+              "blockChars": 232
+            },
+            {
+              "name": "github",
+              "blockChars": 287
+            },
+            {
+              "name": "gog",
+              "blockChars": 221
+            },
+            {
+              "name": "himalaya",
+              "blockChars": 372
+            },
+            {
+              "name": "imsg",
+              "blockChars": 211
+            },
+            {
+              "name": "markdown-to-pdf",
+              "blockChars": 246
+            },
+            {
+              "name": "mcporter",
+              "blockChars": 319
+            },
+            {
+              "name": "nano-pdf",
+              "blockChars": 223
+            },
+            {
+              "name": "news-fetch-gog",
+              "blockChars": 275
+            },
+            {
+              "name": "obsidian",
+              "blockChars": 234
+            },
+            {
+              "name": "openai-whisper",
+              "blockChars": 222
+            },
+            {
+              "name": "openhue",
+              "blockChars": 207
+            },
+            {
+              "name": "oracle",
+              "blockChars": 265
+            },
+            {
+              "name": "ordercli",
+              "blockChars": 237
+            },
+            {
+              "name": "peekaboo",
+              "blockChars": 207
+            },
+            {
+              "name": "sag",
+              "blockChars": 193
+            },
+            {
+              "name": "session-logs",
+              "blockChars": 242
+            },
+            {
+              "name": "skill-creator",
+              "blockChars": 285
+            },
+            {
+              "name": "slack",
+              "blockChars": 301
+            },
+            {
+              "name": "songsee",
+              "blockChars": 240
+            },
+            {
+              "name": "sonoscli",
+              "blockChars": 202
+            },
+            {
+              "name": "summarize",
+              "blockChars": 285
+            },
+            {
+              "name": "things-mac",
+              "blockChars": 425
+            },
+            {
+              "name": "tmux",
+              "blockChars": 244
+            },
+            {
+              "name": "video-frames",
+              "blockChars": 218
+            },
+            {
+              "name": "voice-call",
+              "blockChars": 212
+            },
+            {
+              "name": "wacli",
+              "blockChars": 266
+            },
+            {
+              "name": "weather",
+              "blockChars": 209
+            },
+            {
+              "name": "agent-browser",
+              "blockChars": 411
+            },
+            {
+              "name": "excalidraw-diagram",
+              "blockChars": 458
+            },
+            {
+              "name": "find-skills",
+              "blockChars": 482
+            },
+            {
+              "name": "mermaid-visualizer",
+              "blockChars": 463
+            },
+            {
+              "name": "obsidian-canvas-creator",
+              "blockChars": 416
+            }
+          ]
+        },
+        "tools": {
+          "listChars": 162,
+          "schemaChars": 2365,
+          "entries": [
+            {
+              "name": "read",
+              "summaryChars": 232,
+              "schemaChars": 398,
+              "propertiesCount": 4
+            },
+            {
+              "name": "edit",
+              "summaryChars": 129,
+              "schemaChars": 617,
+              "propertiesCount": 6
+            },
+            {
+              "name": "write",
+              "summaryChars": 127,
+              "schemaChars": 313,
+              "propertiesCount": 3
+            },
+            {
+              "name": "exec",
+              "summaryChars": 181,
+              "schemaChars": 1037,
+              "propertiesCount": 12
+            }
+          ]
+        }
+      }
+    }
+  }
+}

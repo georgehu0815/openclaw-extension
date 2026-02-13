@@ -2,7 +2,7 @@
   "name": "clawdbot-extension",
   "displayName": "Clawdbot Extension",
   "description": "Status bar connector for the Clawdbot CLI",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "publisher": "ghu",
   "author": {
     "name": "ghu",
@@ -60,6 +60,10 @@
       {
         "command": "clawdbot.tui",
         "title": "Clawdbot: Run TUI"
+      },
+      {
+        "command": "clawdbot.openChat",
+        "title": "Clawdbot: Open Chat Panel"
       }
     ],
     "viewsContainers": {
@@ -111,7 +115,7 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "installLocal": "code --install-extension ./clawdbot-extension-1.0.1.vsix",
+    "installLocal": "code --install-extension ./clawdbot-extension-1.0.4.vsix",
     "publish:vsce": "vsce publish",
     "publish:ovsx": "ovsx publish -p $OVSX_TOKEN",
     "publish:all": "scripts/publish-all.sh"
