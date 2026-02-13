@@ -160,12 +160,15 @@ export class ChatPanelProvider {
 
     private _getHtmlForWebview(webview: vscode.Webview) {
         const messagesHtml = this._messages
-            .map(msg => `
-                <div class="message ${msg.role}">
-                    <div class="message-role">${msg.role === 'user' ? 'You' : 'Clawdbot'}</div>
-                    <div class="message-content">${this._escapeHtml(msg.content)}</div>
-                </div>
-            `)
+            .map(msg => {
+                const escapedContent = this._escapeHtml(msg.content);
+                return `
+                    <div class="message ${msg.role}" data-role="${msg.role}">
+                        <div class="message-role">${msg.role === 'user' ? 'You' : 'Clawdbot'}</div>
+                        <div class="message-content ${msg.role === 'assistant' ? 'markdown-content' : ''}" data-content="${this._escapeHtml(msg.content).replace(/"/g, '&quot;')}">${escapedContent}</div>
+                    </div>
+                `;
+            })
             .join('');
 
         return `<!DOCTYPE html>
@@ -268,6 +271,115 @@ export class ChatPanelProvider {
             word-wrap: break-word;
         }
 
+        /* Markdown content styling */
+        .markdown-content {
+            white-space: normal;
+        }
+
+        .markdown-content p {
+            margin: 0 0 8px 0;
+        }
+
+        .markdown-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .markdown-content a {
+            color: var(--vscode-textLink-foreground);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .markdown-content a:hover {
+            color: var(--vscode-textLink-activeForeground);
+            text-decoration: underline;
+        }
+
+        .markdown-content code {
+            background-color: var(--vscode-textCodeBlock-background);
+            color: var(--vscode-textPreformat-foreground);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 12px;
+        }
+
+        .markdown-content pre {
+            background-color: var(--vscode-textCodeBlock-background);
+            padding: 8px 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+
+        .markdown-content pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin: 8px 0;
+            padding-left: 24px;
+        }
+
+        .markdown-content li {
+            margin: 4px 0;
+        }
+
+        .markdown-content blockquote {
+            border-left: 3px solid var(--vscode-textBlockQuote-border);
+            background-color: var(--vscode-textBlockQuote-background);
+            padding: 8px 12px;
+            margin: 8px 0;
+        }
+
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            margin: 12px 0 8px 0;
+            font-weight: 600;
+        }
+
+        .markdown-content h1 { font-size: 18px; }
+        .markdown-content h2 { font-size: 16px; }
+        .markdown-content h3 { font-size: 14px; }
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 { font-size: 13px; }
+
+        .markdown-content table {
+            border-collapse: collapse;
+            margin: 8px 0;
+            width: 100%;
+        }
+
+        .markdown-content table th,
+        .markdown-content table td {
+            border: 1px solid var(--vscode-panel-border);
+            padding: 6px 12px;
+            text-align: left;
+        }
+
+        .markdown-content table th {
+            background-color: var(--vscode-input-background);
+            font-weight: 600;
+        }
+
+        .markdown-content hr {
+            border: none;
+            border-top: 1px solid var(--vscode-panel-border);
+            margin: 12px 0;
+        }
+
+        .markdown-content img {
+            max-width: 100%;
+            height: auto;
+        }
+
         #inputContainer {
             border-top: 1px solid var(--vscode-panel-border);
             padding: 16px;
@@ -362,12 +474,45 @@ export class ChatPanelProvider {
         <button id="sendButton">Send</button>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <script>
         const vscode = acquireVsCodeApi();
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const clearButton = document.getElementById('clearButton');
         const messagesContainer = document.getElementById('messagesContainer');
+
+        // Configure marked
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+        }
+
+        // Render markdown for assistant messages
+        function renderMarkdown() {
+            const markdownElements = document.querySelectorAll('.markdown-content');
+            markdownElements.forEach(element => {
+                const content = element.getAttribute('data-content');
+                if (content && typeof marked !== 'undefined') {
+                    try {
+                        // Decode HTML entities first
+                        const textarea = document.createElement('textarea');
+                        textarea.innerHTML = content;
+                        const decodedContent = textarea.value;
+
+                        // Parse markdown and set innerHTML
+                        element.innerHTML = marked.parse(decodedContent);
+                    } catch (error) {
+                        console.error('Error rendering markdown:', error);
+                    }
+                }
+            });
+        }
+
+        // Render markdown after page loads
+        renderMarkdown();
 
         // Auto-resize textarea
         messageInput.addEventListener('input', function() {

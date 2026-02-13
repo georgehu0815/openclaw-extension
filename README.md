@@ -386,7 +386,7 @@ For development and debugging:
 2. Run `npm run compile` or keep `npm run watch` running
 3. Press `F5` to test in Extension Development Host
 4. Once satisfied, package with `npx vsce package --no-dependencies`
-5. Install with `code --install-extension ./clawdbot-extension-x.x.x.vsix`
+5. Install with ` code --install-extension ./clawdbot-extension-1.0.5.vsix `
 6. Reload VS Code
 
 ### Common Issues

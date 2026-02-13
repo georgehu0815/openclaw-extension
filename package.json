@@ -2,7 +2,7 @@
   "name": "clawdbot-extension",
   "displayName": "Clawdbot Extension",
   "description": "Status bar connector for the Clawdbot CLI",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "ghu",
   "author": {
     "name": "ghu",
@@ -115,14 +115,19 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "installLocal": "code --install-extension ./clawdbot-extension-1.0.4.vsix",
+    "build-install": "scripts/build-and-install.sh",
+    "installLocal": "code --install-extension ./clawdbot-extension-1.0.5.vsix",
     "publish:vsce": "vsce publish",
     "publish:ovsx": "ovsx publish -p $OVSX_TOKEN",
     "publish:all": "scripts/publish-all.sh"
   },
+  "dependencies": {
+    "marked": "^15.0.7"
+  },
   "devDependencies": {
     "@types/vscode": "~1.105.0",
     "@types/node": "^22.19.7",
+    "@types/marked": "^6.0.0",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "eslint": "^9.39.2",
